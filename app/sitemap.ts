@@ -40,12 +40,44 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "weekly",
       priority: 0.8,
     },
+    {
+      url: `${baseUrl}/about`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.6,
+    },
+    {
+      url: `${baseUrl}/license`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.6,
+    },
+    {
+      url: `${baseUrl}/privacy`,
+      lastModified: new Date(),
+      changeFrequency: "yearly",
+      priority: 0.4,
+    },
+    {
+      url: `${baseUrl}/terms`,
+      lastModified: new Date(),
+      changeFrequency: "yearly",
+      priority: 0.4,
+    },
+    {
+      url: `${baseUrl}/contact`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
   ];
 
   // Individual approved media pages
   const mediaPages: MetadataRoute.Sitemap = mediaItems.map((item) => ({
     url: `${baseUrl}/image/${item.id}`,
-    lastModified: new Date(item.created_at),
+    lastModified: item.created_at
+      ? new Date(item.created_at)
+      : new Date(),
     changeFrequency: "monthly",
     priority: item.media_type === "video" ? 0.8 : 0.7,
   }));
@@ -54,21 +86,35 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const categories = [
     ...new Set(
       mediaItems
-        .map((item) => item.category)
-        .filter((category): category is string => Boolean(category))
+        .map((item) => item.category?.trim())
+        .filter(
+          (category): category is string =>
+            Boolean(category)
+        )
     ),
   ];
 
   const categoryPages: MetadataRoute.Sitemap = categories.map(
-    (category) => ({
-      url: `${baseUrl}/categories/${encodeURIComponent(
-        category.toLowerCase()
-      )}`,
-      lastModified: new Date(),
-      changeFrequency: "weekly",
-      priority: 0.7,
-    })
+    (category) => {
+      const slug = encodeURIComponent(
+        category
+          .toLowerCase()
+          .trim()
+          .replace(/\s+/g, "-")
+      );
+
+      return {
+        url: `${baseUrl}/categories/${slug}`,
+        lastModified: new Date(),
+        changeFrequency: "weekly",
+        priority: 0.7,
+      };
+    }
   );
 
-  return [...staticPages, ...categoryPages, ...mediaPages];
+  return [
+    ...staticPages,
+    ...categoryPages,
+    ...mediaPages,
+  ];
 }

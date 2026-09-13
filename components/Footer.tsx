@@ -36,6 +36,13 @@ export default function Footer() {
             </Link>
 
             <Link
+              href="/license"
+              className="text-gray-600 transition hover:text-black"
+            >
+              License
+            </Link>
+
+            <Link
               href="/privacy"
               className="text-gray-600 transition hover:text-black"
             >
