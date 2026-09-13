@@ -1,10 +1,8 @@
-"use client";
+import type { Metadata } from "next";
+import { createClient } from "@supabase/supabase-js";
+import MediaDetailClient from "./MediaDetailClient";
 
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-import { supabase } from "@/lib/supabase";
-
-type ImageItem = {
+type MediaItem = {
   id: number;
   title: string;
   category: string;
@@ -13,149 +11,159 @@ type ImageItem = {
   image_url: string;
   status: string;
   downloads: number;
+  media_type: string | null;
 };
 
-export default function ImagePage() {
-  const params = useParams();
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  {
+    auth: {
+      persistSession: false,
+    },
+  }
+);
 
-  const [image, setImage] = useState<ImageItem | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
-  const [downloading, setDownloading] = useState(false);
+async function getMedia(id: number): Promise<MediaItem | null> {
+  if (!id) return null;
 
-  useEffect(() => {
-    const fetchImage = async () => {
-      const id = Number(params.id);
+  const { data, error } = await supabase
+    .from("images")
+    .select(
+      "id, title, category, tags, description, image_url, status, downloads, media_type"
+    )
+    .eq("id", id)
+    .eq("status", "approved")
+    .single();
 
-      if (!id) {
-        setNotFound(true);
-        setLoading(false);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from("images")
-        .select("*")
-        .eq("id", id)
-        .eq("status", "approved")
-        .single();
-
-      if (error || !data) {
-        console.error("Failed to load image:", error);
-        setNotFound(true);
-        setLoading(false);
-        return;
-      }
-
-      setImage(data);
-      setLoading(false);
-    };
-
-    fetchImage();
-  }, [params.id]);
-
-  const handleDownload = async () => {
-    if (!image || downloading) return;
-
-    try {
-      setDownloading(true);
-
-      // Securely increment download count
-      const { error: downloadCountError } = await supabase.rpc(
-        "increment_downloads",
-        {
-          image_id: image.id,
-        }
-      );
-
-      if (downloadCountError) {
-        throw downloadCountError;
-      }
-
-      // Fetch actual image file
-      const response = await fetch(image.image_url);
-
-      if (!response.ok) {
-        throw new Error("Unable to download image.");
-      }
-
-      const blob = await response.blob();
-
-      // Try to preserve the original file type
-      const contentType = blob.type || "image/jpeg";
-
-      let extension = "jpg";
-
-      if (contentType.includes("png")) {
-        extension = "png";
-      } else if (contentType.includes("webp")) {
-        extension = "webp";
-      } else if (contentType.includes("gif")) {
-        extension = "gif";
-      } else if (contentType.includes("jpeg")) {
-        extension = "jpg";
-      }
-
-      const url = window.URL.createObjectURL(blob);
-
-      const link = document.createElement("a");
-
-      const safeTitle = image.title
-        .toLowerCase()
-        .trim()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, "");
-
-      link.href = url;
-      link.download = `${safeTitle || "heya-image"}.${extension}`;
-
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-
-      window.URL.revokeObjectURL(url);
-
-      // Update visible count instantly
-      setImage((current) =>
-        current
-          ? {
-              ...current,
-              downloads: (current.downloads || 0) + 1,
-            }
-          : current
-      );
-    } catch (error) {
-      console.error("Download failed:", error);
-
-      alert(
-        error instanceof Error
-          ? `Download failed: ${error.message}`
-          : "Download failed. Please try again."
-      );
-    } finally {
-      setDownloading(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-white text-black">
-        <p className="text-lg font-semibold">
-          Loading image...
-        </p>
-      </main>
-    );
+  if (error || !data) {
+    return null;
   }
 
-  if (notFound || !image) {
+  return data;
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+
+  const media = await getMedia(Number(id));
+
+  if (!media) {
+    return {
+      title: "Media Not Found",
+      description: "The requested stock media could not be found on Heya.",
+      robots: {
+        index: false,
+        follow: false,
+      },
+    };
+  }
+
+  const isVideo = media.media_type === "video";
+
+  const description =
+    media.description ||
+    `Download this free ${
+      isVideo ? "stock video" : "stock photo"
+    } from Heya for websites, social media, marketing and creative projects.`;
+
+  const keywords = media.tags
+    ? media.tags
+        .split(",")
+        .map((tag) => tag.trim())
+        .filter(Boolean)
+    : [];
+
+  return {
+    title: `${media.title} - Free Stock ${
+      isVideo ? "Video" : "Photo"
+    }`,
+
+    description,
+
+    keywords: [
+      media.title,
+      media.category,
+      isVideo ? "free stock video" : "free stock photo",
+      ...keywords,
+    ],
+
+    alternates: {
+      canonical: `/image/${media.id}`,
+    },
+
+    openGraph: {
+      title: `${media.title} - Free Stock ${
+        isVideo ? "Video" : "Photo"
+      }`,
+      description,
+      url: `https://heya-stock.vercel.app/image/${media.id}`,
+      siteName: "Heya",
+      type: "website",
+
+      images: !isVideo
+        ? [
+            {
+              url: media.image_url,
+              alt: media.title,
+            },
+          ]
+        : undefined,
+
+      videos: isVideo
+        ? [
+            {
+              url: media.image_url,
+            },
+          ]
+        : undefined,
+    },
+
+    twitter: {
+      card: "summary_large_image",
+      title: `${media.title} - Free Stock ${
+        isVideo ? "Video" : "Photo"
+      }`,
+      description,
+      images: !isVideo ? [media.image_url] : undefined,
+    },
+
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: {
+        index: true,
+        follow: true,
+        "max-image-preview": "large",
+        "max-video-preview": -1,
+        "max-snippet": -1,
+      },
+    },
+  };
+}
+
+export default async function MediaPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+
+  const media = await getMedia(Number(id));
+
+  if (!media) {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center bg-white px-6 text-black">
+      <main className="flex min-h-screen flex-col items-center justify-center bg-white px-6 text-center text-black">
         <h1 className="text-3xl font-bold">
-          Image not found
+          Media not found
         </h1>
 
         <p className="mt-3 text-gray-500">
-          This image may not exist or may not be approved yet.
+          This item may not exist or may not be approved yet.
         </p>
 
         <a
@@ -168,100 +176,5 @@ export default function ImagePage() {
     );
   }
 
-  return (
-    <main className="min-h-screen bg-gray-50 text-black">
-      <header className="border-b bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <a
-            href="/"
-            className="text-2xl font-bold"
-          >
-            Heya
-          </a>
-
-          <a
-            href="/"
-            className="rounded-full border px-5 py-2 text-sm font-semibold transition hover:bg-gray-50"
-          >
-            Back to Explore
-          </a>
-        </div>
-      </header>
-
-      <section className="mx-auto grid max-w-7xl gap-10 px-6 py-12 lg:grid-cols-2">
-        <div className="overflow-hidden rounded-2xl bg-gray-200">
-          <img
-            src={image.image_url}
-            alt={`${image.title} stock image`}
-            className="h-full max-h-[700px] w-full object-contain"
-          />
-        </div>
-
-        <div className="flex flex-col justify-center">
-          <p className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-500">
-            Free Stock Image
-          </p>
-
-          <h1 className="text-4xl font-bold">
-            {image.title}
-          </h1>
-
-          <p className="mt-3 text-sm font-semibold text-gray-500">
-            {image.category}
-          </p>
-
-          {image.description && (
-            <p className="mt-5 max-w-xl text-lg leading-8 text-gray-600">
-              {image.description}
-            </p>
-          )}
-
-          {image.tags && (
-            <div className="mt-5">
-              <p className="text-sm font-semibold text-gray-500">
-                Tags
-              </p>
-
-              <div className="mt-2 flex flex-wrap gap-2">
-                {image.tags
-                  .split(",")
-                  .map((tag) => tag.trim())
-                  .filter(Boolean)
-                  .map((tag) => (
-                    <span
-                      key={tag}
-                      className="rounded-full bg-gray-200 px-3 py-1 text-sm text-gray-700"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-              </div>
-            </div>
-          )}
-
-          <div className="mt-8">
-            <button
-              onClick={handleDownload}
-              disabled={downloading}
-              className="rounded-xl bg-black px-8 py-4 font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-400"
-            >
-              {downloading
-                ? "Downloading..."
-                : "↓ Download Free"}
-            </button>
-          </div>
-
-          <div className="mt-8 border-t pt-6">
-            <p className="text-sm text-gray-500">
-              Downloads: {image.downloads || 0}
-            </p>
-
-            <p className="mt-2 text-sm text-gray-500">
-              Free to download for creative projects.
-            </p>
-          </div>
-        </div>
-      </section>
-    </main>
-  );
+  return <MediaDetailClient initialMedia={media} />;
 }
