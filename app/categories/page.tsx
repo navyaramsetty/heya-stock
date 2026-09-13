@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { createClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
+
 type MediaItem = {
   id: number;
   title: string;
@@ -115,23 +116,13 @@ export default async function CategoriesPage() {
 
   return (
     <main className="min-h-screen bg-white text-black">
-      <header className="border-b">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <a href="/" className="text-2xl font-bold">
-            Heya
-          </a>
-
-          <nav className="flex gap-6 text-sm font-medium">
-            <a href="/">Explore</a>
-            <a href="/categories">Categories</a>
-            <a href="#">About</a>
-          </nav>
-        </div>
-      </header>
-
       <section className="mx-auto max-w-7xl px-6 py-14">
         <div className="mb-10">
-          <h1 className="text-4xl font-bold">
+          <p className="text-sm font-semibold uppercase tracking-widest text-gray-500">
+            Categories
+          </p>
+
+          <h1 className="mt-3 text-4xl font-bold">
             Browse Stock Photo & Video Categories
           </h1>
 

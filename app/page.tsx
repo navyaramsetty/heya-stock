@@ -111,79 +111,52 @@ export default function HomePage() {
   ).length;
 
   return (
-    <main className="min-h-screen bg-white text-black">
-      {/* HEADER */}
-      <header className="sticky top-0 z-50 border-b bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4">
-          <a href="/" className="text-2xl font-black tracking-tight">
-            Heya
-          </a>
+    <main className="bg-white text-black">
+      {/* ACCOUNT ACTIONS */}
+      <section className="border-b bg-white">
+        <div className="mx-auto flex max-w-7xl justify-end gap-3 px-5 py-3">
+          {user ? (
+            <>
+              <a
+                href="/upload"
+                className="rounded-full bg-black px-4 py-2 text-sm font-semibold text-white transition hover:bg-gray-800"
+              >
+                Upload
+              </a>
 
-          <nav className="flex items-center gap-3 sm:gap-5">
-            <a
-              href="#explore"
-              className="hidden text-sm font-semibold text-gray-600 transition hover:text-black sm:block"
-            >
-              Explore
-            </a>
+              <a
+                href="/dashboard"
+                className="rounded-full border px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+              >
+                Dashboard
+              </a>
 
-            <a
-              href="/categories"
-              className="hidden text-sm font-semibold text-gray-600 transition hover:text-black md:block"
-            >
-              Categories
-            </a>
+              <button
+                onClick={handleLogout}
+                className="px-2 py-2 text-sm font-semibold text-gray-600 transition hover:text-black"
+              >
+                Logout
+              </button>
+            </>
+          ) : (
+            <>
+              <a
+                href="/login"
+                className="px-3 py-2 text-sm font-semibold text-gray-700"
+              >
+                Login
+              </a>
 
-            <a
-              href="#about"
-              className="hidden text-sm font-semibold text-gray-600 transition hover:text-black lg:block"
-            >
-              About
-            </a>
-
-            {user ? (
-              <>
-                <a
-                  href="/upload"
-                  className="rounded-full bg-black px-4 py-2 text-sm font-semibold text-white transition hover:bg-gray-800"
-                >
-                  Upload
-                </a>
-
-                <a
-                  href="/dashboard"
-                  className="hidden text-sm font-semibold text-gray-600 transition hover:text-black sm:block"
-                >
-                  Dashboard
-                </a>
-
-                <button
-                  onClick={handleLogout}
-                  className="hidden text-sm font-semibold text-gray-600 transition hover:text-black md:block"
-                >
-                  Logout
-                </button>
-              </>
-            ) : (
-              <>
-                <a
-                  href="/login"
-                  className="text-sm font-semibold text-gray-700"
-                >
-                  Login
-                </a>
-
-                <a
-                  href="/signup"
-                  className="rounded-full bg-black px-4 py-2 text-sm font-semibold text-white transition hover:bg-gray-800"
-                >
-                  Sign Up
-                </a>
-              </>
-            )}
-          </nav>
+              <a
+                href="/signup"
+                className="rounded-full bg-black px-4 py-2 text-sm font-semibold text-white transition hover:bg-gray-800"
+              >
+                Sign Up
+              </a>
+            </>
+          )}
         </div>
-      </header>
+      </section>
 
       {/* HERO */}
       <section className="border-b bg-gray-50">
@@ -269,8 +242,8 @@ export default function HomePage() {
               {filter === "video"
                 ? "Stock Videos"
                 : filter === "image"
-                ? "Stock Photos"
-                : "Latest Media"}
+                  ? "Stock Photos"
+                  : "Latest Media"}
             </h2>
           </div>
 
@@ -311,30 +284,33 @@ export default function HomePage() {
                   key={item.id}
                   className="group relative mb-5 break-inside-avoid overflow-hidden rounded-2xl bg-gray-100"
                 >
-                  {isVideo ? (
-                    <div className="relative overflow-hidden bg-black">
-                      <video
-                        src={item.image_url || ""}
-                        controls
-                        preload="metadata"
-                        playsInline
-                        className="max-h-[520px] w-full object-cover"
-                      />
+                  <a
+                    href={`/image/${item.id}`}
+                    className="block"
+                  >
+                    {isVideo ? (
+                      <div className="relative overflow-hidden bg-black">
+                        <video
+                          src={item.image_url || ""}
+                          muted
+                          playsInline
+                          preload="metadata"
+                          className="max-h-[520px] w-full object-cover"
+                        />
 
-                      <span className="pointer-events-none absolute left-3 top-3 rounded-full bg-black/70 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
-                        ▶ Video
-                      </span>
-                    </div>
-                  ) : (
-                    <a href={`/image/${item.id}`} className="block">
+                        <span className="pointer-events-none absolute left-3 top-3 rounded-full bg-black/70 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
+                          ▶ Video
+                        </span>
+                      </div>
+                    ) : (
                       <img
                         src={item.image_url || ""}
-                        alt={item.title}
+                        alt={`${item.title} free stock photo`}
                         loading="lazy"
                         className="w-full object-cover transition duration-300 group-hover:scale-[1.02]"
                       />
-                    </a>
-                  )}
+                    )}
+                  </a>
 
                   <div className="bg-white p-4">
                     <div className="flex items-start justify-between gap-4">
@@ -365,20 +341,12 @@ export default function HomePage() {
                       )}
                     </div>
 
-                    {!isVideo && (
-                      <a
-                        href={`/image/${item.id}`}
-                        className="mt-4 block rounded-xl border px-4 py-2 text-center text-sm font-semibold transition hover:bg-gray-50"
-                      >
-                        View Photo
-                      </a>
-                    )}
-
-                    {isVideo && (
-                      <p className="mt-4 text-xs text-gray-400">
-                        Video details and download page coming next.
-                      </p>
-                    )}
+                    <a
+                      href={`/image/${item.id}`}
+                      className="mt-4 block rounded-xl border px-4 py-2 text-center text-sm font-semibold transition hover:bg-gray-50"
+                    >
+                      {isVideo ? "View Video" : "View Photo"}
+                    </a>
                   </div>
                 </article>
               );
@@ -387,11 +355,8 @@ export default function HomePage() {
         )}
       </section>
 
-      {/* ABOUT */}
-      <section
-        id="about"
-        className="border-t bg-gray-50"
-      >
+      {/* ABOUT PREVIEW */}
+      <section className="border-t bg-gray-50">
         <div className="mx-auto max-w-5xl px-6 py-20 text-center">
           <p className="text-sm font-semibold uppercase tracking-wider text-gray-500">
             About Heya
@@ -406,21 +371,15 @@ export default function HomePage() {
             contributed by creators and made easy to discover,
             preview and download.
           </p>
+
+          <a
+            href="/about"
+            className="mt-7 inline-block rounded-xl bg-black px-6 py-3 text-sm font-semibold text-white transition hover:bg-gray-800"
+          >
+            Learn About Heya
+          </a>
         </div>
       </section>
-
-      {/* FOOTER */}
-      <footer className="border-t">
-        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-6 py-8 text-sm text-gray-500 sm:flex-row sm:items-center sm:justify-between">
-          <p>
-            © {new Date().getFullYear()} Heya
-          </p>
-
-          <p>
-            Free Stock Images & Videos
-          </p>
-        </div>
-      </footer>
     </main>
   );
 }

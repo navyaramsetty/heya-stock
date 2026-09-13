@@ -18,30 +18,20 @@ export default function CategoryClient({
 }) {
   return (
     <main className="min-h-screen bg-white text-black">
-      <header className="border-b">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <a href="/" className="text-2xl font-bold">
-            Heya
-          </a>
-
-          <nav className="flex gap-6 text-sm font-medium">
-            <a href="/">Explore</a>
-            <a href="/categories">Categories</a>
-            <a href="#">About</a>
-          </nav>
-        </div>
-      </header>
-
       <section className="mx-auto max-w-7xl px-6 py-12">
         <a
           href="/categories"
-          className="mb-6 inline-block text-sm font-semibold text-gray-600"
+          className="mb-6 inline-block text-sm font-semibold text-gray-600 transition hover:text-black"
         >
           ← Back to Categories
         </a>
 
         <div className="mb-10">
-          <h1 className="text-4xl font-bold">
+          <p className="text-sm font-semibold uppercase tracking-widest text-gray-500">
+            Category
+          </p>
+
+          <h1 className="mt-3 text-4xl font-bold">
             {categoryName} Stock Photos & Videos
           </h1>
 
@@ -126,7 +116,7 @@ export default function CategoryClient({
 
             <a
               href="/categories"
-              className="mt-6 inline-block rounded-xl bg-black px-6 py-3 font-semibold text-white"
+              className="mt-6 inline-block rounded-xl bg-black px-6 py-3 font-semibold text-white transition hover:bg-gray-800"
             >
               Browse Other Categories
             </a>

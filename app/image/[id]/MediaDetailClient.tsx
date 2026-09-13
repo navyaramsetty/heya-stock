@@ -31,7 +31,6 @@ export default function MediaDetailClient({
     try {
       setDownloading(true);
 
-      // Increment download count securely
       const { error: downloadCountError } = await supabase.rpc(
         "increment_downloads",
         {
@@ -43,7 +42,6 @@ export default function MediaDetailClient({
         throw downloadCountError;
       }
 
-      // Fetch the actual media file
       const response = await fetch(media.image_url);
 
       if (!response.ok) {
@@ -55,7 +53,6 @@ export default function MediaDetailClient({
       const blob = await response.blob();
       const contentType = blob.type || "";
 
-      // Detect correct file extension
       let extension = isVideo ? "mp4" : "jpg";
 
       if (contentType.includes("video/mp4")) {
@@ -75,7 +72,6 @@ export default function MediaDetailClient({
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
 
-      // SEO-friendly download filename
       const safeTitle = media.title
         .toLowerCase()
         .trim()
@@ -96,7 +92,6 @@ export default function MediaDetailClient({
 
       window.URL.revokeObjectURL(url);
 
-      // Update visible download count
       setMedia((current) => ({
         ...current,
         downloads: (current.downloads || 0) + 1,
@@ -121,25 +116,15 @@ export default function MediaDetailClient({
         .filter(Boolean)
     : [];
 
+  const categorySlug = encodeURIComponent(
+    media.category
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, "-")
+  );
+
   return (
     <main className="min-h-screen bg-gray-50 text-black">
-      {/* Header */}
-      <header className="border-b bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <a href="/" className="text-2xl font-black">
-            Heya
-          </a>
-
-          <a
-            href="/"
-            className="rounded-full border px-5 py-2 text-sm font-semibold transition hover:bg-gray-50"
-          >
-            Back to Explore
-          </a>
-        </div>
-      </header>
-
-      {/* Media details */}
       <section className="mx-auto grid max-w-7xl gap-10 px-6 py-12 lg:grid-cols-2">
         {/* Preview */}
         <div className="flex min-h-[400px] items-center justify-center overflow-hidden rounded-2xl bg-black">
@@ -164,6 +149,13 @@ export default function MediaDetailClient({
 
         {/* Information */}
         <div className="flex flex-col justify-center">
+          <a
+            href="/"
+            className="mb-6 inline-block text-sm font-semibold text-gray-500 transition hover:text-black"
+          >
+            ← Back to Explore
+          </a>
+
           <p className="mb-3 text-sm font-bold uppercase tracking-wider text-gray-500">
             {isVideo ? "Free Stock Video" : "Free Stock Photo"}
           </p>
@@ -174,10 +166,8 @@ export default function MediaDetailClient({
 
           {/* Category */}
           <a
-            href={`/categories/${encodeURIComponent(
-              media.category.toLowerCase()
-            )}`}
-            className="mt-3 inline-block text-sm font-semibold text-gray-500 hover:text-black"
+            href={`/categories/${categorySlug}`}
+            className="mt-3 inline-block text-sm font-semibold text-gray-500 transition hover:text-black"
           >
             {media.category}
           </a>
