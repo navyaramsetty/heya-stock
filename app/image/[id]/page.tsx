@@ -12,7 +12,10 @@ type MediaItem = {
   status: string;
   downloads: number;
   media_type: string | null;
+  created_at: string;
 };
+
+const baseUrl = "https://heya-stock.vercel.app";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -30,7 +33,7 @@ async function getMedia(id: number): Promise<MediaItem | null> {
   const { data, error } = await supabase
     .from("images")
     .select(
-      "id, title, category, tags, description, image_url, status, downloads, media_type"
+      "id, title, category, tags, description, image_url, status, downloads, media_type, created_at"
     )
     .eq("id", id)
     .eq("status", "approved")
@@ -55,7 +58,8 @@ export async function generateMetadata({
   if (!media) {
     return {
       title: "Media Not Found",
-      description: "The requested stock media could not be found on Heya.",
+      description:
+        "The requested stock media could not be found on Heya.",
       robots: {
         index: false,
         follow: false,
@@ -78,11 +82,12 @@ export async function generateMetadata({
         .filter(Boolean)
     : [];
 
-  return {
-    title: `${media.title} - Free Stock ${
-      isVideo ? "Video" : "Photo"
-    }`,
+  const pageTitle = `${media.title} - Free Stock ${
+    isVideo ? "Video" : "Photo"
+  }`;
 
+  return {
+    title: pageTitle,
     description,
 
     keywords: [
@@ -97,11 +102,9 @@ export async function generateMetadata({
     },
 
     openGraph: {
-      title: `${media.title} - Free Stock ${
-        isVideo ? "Video" : "Photo"
-      }`,
+      title: pageTitle,
       description,
-      url: `https://heya-stock.vercel.app/image/${media.id}`,
+      url: `${baseUrl}/image/${media.id}`,
       siteName: "Heya",
       type: "website",
 
@@ -125,9 +128,7 @@ export async function generateMetadata({
 
     twitter: {
       card: "summary_large_image",
-      title: `${media.title} - Free Stock ${
-        isVideo ? "Video" : "Photo"
-      }`,
+      title: pageTitle,
       description,
       images: !isVideo ? [media.image_url] : undefined,
     },
@@ -176,5 +177,59 @@ export default async function MediaPage({
     );
   }
 
-  return <MediaDetailClient initialMedia={media} />;
+  const isVideo = media.media_type === "video";
+
+  const description =
+    media.description ||
+    `Free ${
+      isVideo ? "stock video" : "stock photo"
+    } available to download from Heya.`;
+
+  const keywords = media.tags
+    ? media.tags
+        .split(",")
+        .map((tag) => tag.trim())
+        .filter(Boolean)
+    : [];
+
+  const structuredData = isVideo
+    ? {
+        "@context": "https://schema.org",
+        "@type": "VideoObject",
+        name: media.title,
+        description,
+        uploadDate: media.created_at,
+        contentUrl: media.image_url,
+        url: `${baseUrl}/image/${media.id}`,
+        keywords: keywords.join(", "),
+        genre: media.category,
+      }
+    : {
+        "@context": "https://schema.org",
+        "@type": "ImageObject",
+        name: media.title,
+        description,
+        contentUrl: media.image_url,
+        url: `${baseUrl}/image/${media.id}`,
+        uploadDate: media.created_at,
+        keywords: keywords.join(", "),
+        genre: media.category,
+        representativeOfPage: true,
+      };
+
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(structuredData).replace(
+            /</g,
+            "\\u003c"
+          ),
+        }}
+      />
+
+      <MediaDetailClient initialMedia={media} />
+    </>
+  );
 }
