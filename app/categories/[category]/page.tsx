@@ -1,34 +1,36 @@
-"use client";
+import type { Metadata } from "next";
+import { createClient } from "@supabase/supabase-js";
+import CategoryClient from "./CategoryClient";
 
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-import { supabase } from "@/lib/supabase";
-
-type ImageItem = {
+type MediaItem = {
   id: number;
   title: string;
   category: string;
   image_url: string;
   status: string;
+  media_type: string | null;
 };
 
-export default function CategoryPage() {
-  const params = useParams();
+const baseUrl = "https://heya-stock.vercel.app";
 
-  const [images, setImages] = useState<ImageItem[]>([]);
-  const [loading, setLoading] = useState(true);
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  {
+    auth: {
+      persistSession: false,
+    },
+  }
+);
 
-  const rawCategory = Array.isArray(params.category)
-    ? params.category[0]
-    : params.category;
-
-  const decodedCategory = decodeURIComponent(rawCategory || "");
-
-  const normalizedCategory = decodedCategory
+function normalizeCategory(value: string) {
+  return decodeURIComponent(value)
     .replace(/-/g, " ")
     .trim();
+}
 
-  const categoryName = normalizedCategory
+function formatCategoryName(value: string) {
+  return value
     .split(" ")
     .map(
       (word) =>
@@ -36,137 +38,105 @@ export default function CategoryPage() {
         word.slice(1).toLowerCase()
     )
     .join(" ");
+}
 
-  useEffect(() => {
-    const fetchCategoryImages = async () => {
-      if (!normalizedCategory) {
-        setLoading(false);
-        return;
-      }
+async function getCategoryMedia(category: string) {
+  const normalizedCategory = normalizeCategory(category);
 
-      setLoading(true);
+  const { data, error } = await supabase
+    .from("images")
+    .select(
+      "id, title, category, image_url, status, media_type"
+    )
+    .eq("status", "approved")
+    .ilike("category", normalizedCategory)
+    .order("created_at", { ascending: false });
 
-      const { data, error } = await supabase
-        .from("images")
-        .select("id, title, category, image_url, status")
-        .eq("status", "approved")
-        .ilike("category", normalizedCategory)
-        .order("created_at", { ascending: false });
+  if (error) {
+    console.error("Failed to load category media:", error);
+    return [];
+  }
 
-      if (error) {
-        console.error("Failed to load category images:", error);
-        setImages([]);
-        setLoading(false);
-        return;
-      }
+  return (data || []) as MediaItem[];
+}
 
-      setImages(data || []);
-      setLoading(false);
-    };
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ category: string }>;
+}): Promise<Metadata> {
+  const { category } = await params;
 
-    fetchCategoryImages();
-  }, [normalizedCategory]);
+  const normalizedCategory =
+    normalizeCategory(category);
+
+  const categoryName =
+    formatCategoryName(normalizedCategory);
+
+  const title = `${categoryName} Stock Photos & Videos`;
+
+  const description = `Browse and download free ${categoryName.toLowerCase()} stock photos and videos for websites, social media, marketing, design and creative projects.`;
+
+  const canonicalPath = `/categories/${encodeURIComponent(
+    normalizedCategory.toLowerCase().replace(/\s+/g, "-")
+  )}`;
+
+  return {
+    title,
+    description,
+
+    keywords: [
+      `${categoryName} stock photos`,
+      `${categoryName} stock videos`,
+      `free ${categoryName.toLowerCase()} images`,
+      `free ${categoryName.toLowerCase()} videos`,
+      `${categoryName} stock media`,
+    ],
+
+    alternates: {
+      canonical: canonicalPath,
+    },
+
+    openGraph: {
+      title: `${title} | Heya`,
+      description,
+      url: `${baseUrl}${canonicalPath}`,
+      siteName: "Heya",
+      type: "website",
+    },
+
+    twitter: {
+      card: "summary_large_image",
+      title: `${title} | Heya`,
+      description,
+    },
+
+    robots: {
+      index: true,
+      follow: true,
+    },
+  };
+}
+
+export default async function CategoryPage({
+  params,
+}: {
+  params: Promise<{ category: string }>;
+}) {
+  const { category } = await params;
+
+  const normalizedCategory =
+    normalizeCategory(category);
+
+  const categoryName =
+    formatCategoryName(normalizedCategory);
+
+  const media = await getCategoryMedia(category);
 
   return (
-    <main className="min-h-screen bg-white text-black">
-      <header className="border-b">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <a href="/" className="text-2xl font-bold">
-            Heya
-          </a>
-
-          <nav className="flex gap-6 text-sm font-medium">
-            <a href="/">Explore</a>
-            <a href="/categories">Categories</a>
-            <a href="#">About</a>
-          </nav>
-        </div>
-      </header>
-
-      <section className="mx-auto max-w-7xl px-6 py-12">
-        <a
-          href="/categories"
-          className="mb-6 inline-block text-sm font-semibold text-gray-600"
-        >
-          ← Back to Categories
-        </a>
-
-        <div className="mb-10">
-          <h1 className="text-4xl font-bold">
-            {categoryName} Stock Images
-          </h1>
-
-          <p className="mt-3 text-gray-600">
-            Browse free {categoryName.toLowerCase()} images available for
-            download.
-          </p>
-        </div>
-
-        {loading && (
-          <div className="py-16 text-center">
-            <p className="text-gray-500">
-              Loading images...
-            </p>
-          </div>
-        )}
-
-        {!loading && images.length > 0 && (
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {images.map((image) => (
-              <div
-                key={image.id}
-                className="group overflow-hidden rounded-2xl border bg-white transition hover:-translate-y-1 hover:shadow-lg"
-              >
-                <a href={`/image/${image.id}`}>
-                  <div className="h-72 overflow-hidden bg-gray-200">
-                    <img
-                      src={image.image_url}
-                      alt={`${image.title} stock image`}
-                      className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                    />
-                  </div>
-                </a>
-
-                <div className="p-4">
-                  <h2 className="font-bold">
-                    {image.title}
-                  </h2>
-
-                  <p className="mt-1 text-sm text-gray-500">
-                    {image.category}
-                  </p>
-
-                  <a
-                    href={`/image/${image.id}`}
-                    className="mt-4 inline-block rounded-lg bg-black px-4 py-2 text-sm font-semibold text-white transition hover:bg-gray-800"
-                  >
-                    View Image
-                  </a>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {!loading && images.length === 0 && (
-          <div className="rounded-2xl border bg-gray-50 p-10 text-center">
-            <h2 className="text-xl font-bold">
-              No images found
-            </h2>
-
-            <p className="mt-2 text-gray-500">
-              There are currently no approved images in this category.
-            </p>
-
-            <a
-              href="/categories"
-              className="mt-6 inline-block rounded-xl bg-black px-6 py-3 font-semibold text-white"
-            >
-              Browse Other Categories
-            </a>
-          </div>
-        )}
-      </section>
-    </main>
+    <CategoryClient
+      media={media}
+      categoryName={categoryName}
+    />
   );
 }
