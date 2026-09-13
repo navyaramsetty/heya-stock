@@ -4,12 +4,13 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
-type ImageItem = {
+type MediaItem = {
   id: number;
   title: string;
   category: string;
   image_url: string | null;
   storage_path: string | null;
+  media_type: string | null;
   status: string;
   downloads: number;
   created_at: string;
@@ -19,7 +20,7 @@ type ImageItem = {
 export default function DashboardPage() {
   const router = useRouter();
 
-  const [images, setImages] = useState<ImageItem[]>([]);
+  const [items, setItems] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState("");
   const [userName, setUserName] = useState("");
@@ -49,63 +50,61 @@ export default function DashboardPage() {
       const { data, error } = await supabase
         .from("images")
         .select(
-          "id, title, category, image_url, storage_path, status, downloads, created_at"
+          "id, title, category, image_url, storage_path, media_type, status, downloads, created_at"
         )
         .eq("user_id", session.user.id)
         .order("created_at", { ascending: false });
 
       if (error) {
-        console.error("Failed to load user images:", error);
-        setImages([]);
+        console.error("Failed to load uploads:", error);
+        setItems([]);
         setLoading(false);
         return;
       }
 
-      const userImages: ImageItem[] = data || [];
+      const uploads: MediaItem[] = data || [];
 
-      const imagesWithPreviews = await Promise.all(
-        userImages.map(async (image) => {
-          // Approved images already have a public URL
-          if (image.image_url) {
+      const uploadsWithPreviews = await Promise.all(
+        uploads.map(async (item) => {
+          if (item.image_url) {
             return {
-              ...image,
-              preview_url: image.image_url,
+              ...item,
+              preview_url: item.image_url,
             };
           }
 
-          // Pending/rejected submissions are private
-          if (image.storage_path) {
+          if (item.storage_path) {
             const { data: signedData, error: signedError } =
               await supabase.storage
                 .from("submissions")
-                .createSignedUrl(image.storage_path, 3600);
+                .createSignedUrl(item.storage_path, 3600);
 
             if (signedError) {
               console.error(
-                `Failed to create preview for image ${image.id}:`,
+                `Failed to generate preview for ${item.id}:`,
                 signedError
               );
 
               return {
-                ...image,
+                ...item,
                 preview_url: null,
               };
             }
 
             return {
-              ...image,
+              ...item,
               preview_url: signedData.signedUrl,
             };
           }
 
           return {
-            ...image,
+            ...item,
             preview_url: null,
           };
         })
       );
 
-      setImages(imagesWithPreviews);
+      setItems(uploadsWithPreviews);
       setLoading(false);
     };
 
@@ -114,7 +113,6 @@ export default function DashboardPage() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-
     router.push("/");
     router.refresh();
   };
@@ -131,16 +129,20 @@ export default function DashboardPage() {
     return "bg-yellow-100 text-yellow-700";
   };
 
-  const approvedCount = images.filter(
-    (image) => image.status === "approved"
+  const approvedCount = items.filter(
+    (item) => item.status === "approved"
   ).length;
 
-  const pendingCount = images.filter(
-    (image) => image.status === "pending"
+  const pendingCount = items.filter(
+    (item) => item.status === "pending"
   ).length;
 
-  const totalDownloads = images.reduce(
-    (total, image) => total + (image.downloads || 0),
+  const videoCount = items.filter(
+    (item) => item.media_type === "video"
+  ).length;
+
+  const totalDownloads = items.reduce(
+    (total, item) => total + (item.downloads || 0),
     0
   );
 
@@ -156,7 +158,6 @@ export default function DashboardPage() {
 
   return (
     <main className="min-h-screen bg-gray-50 text-black">
-      {/* Header */}
       <header className="border-b bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
           <a href="/" className="text-2xl font-bold">
@@ -189,7 +190,6 @@ export default function DashboardPage() {
       </header>
 
       <section className="mx-auto max-w-7xl px-6 py-10">
-        {/* Welcome */}
         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-wider text-gray-500">
@@ -209,19 +209,18 @@ export default function DashboardPage() {
             href="/upload"
             className="inline-flex items-center justify-center rounded-xl bg-black px-6 py-3 font-semibold text-white transition hover:bg-gray-800"
           >
-            + Upload Image
+            + Upload Media
           </a>
         </div>
 
-        {/* Statistics */}
-        <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
           <div className="rounded-2xl bg-white p-6 shadow-sm">
             <p className="text-sm text-gray-500">
               Total Uploads
             </p>
 
             <p className="mt-2 text-3xl font-bold">
-              {images.length}
+              {items.length}
             </p>
           </div>
 
@@ -237,7 +236,7 @@ export default function DashboardPage() {
 
           <div className="rounded-2xl bg-white p-6 shadow-sm">
             <p className="text-sm text-gray-500">
-              Pending Review
+              Pending
             </p>
 
             <p className="mt-2 text-3xl font-bold">
@@ -247,7 +246,17 @@ export default function DashboardPage() {
 
           <div className="rounded-2xl bg-white p-6 shadow-sm">
             <p className="text-sm text-gray-500">
-              Total Downloads
+              Videos
+            </p>
+
+            <p className="mt-2 text-3xl font-bold">
+              {videoCount}
+            </p>
+          </div>
+
+          <div className="rounded-2xl bg-white p-6 shadow-sm">
+            <p className="text-sm text-gray-500">
+              Downloads
             </p>
 
             <p className="mt-2 text-3xl font-bold">
@@ -256,7 +265,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Uploads */}
         <div className="mt-12">
           <div className="mb-6 flex items-center justify-between">
             <h2 className="text-2xl font-bold">
@@ -264,110 +272,126 @@ export default function DashboardPage() {
             </h2>
 
             <p className="text-sm text-gray-500">
-              {images.length}{" "}
-              {images.length === 1 ? "submission" : "submissions"}
+              {items.length}{" "}
+              {items.length === 1 ? "submission" : "submissions"}
             </p>
           </div>
 
-          {images.length === 0 ? (
+          {items.length === 0 ? (
             <div className="rounded-2xl bg-white px-6 py-16 text-center shadow-sm">
               <h3 className="text-xl font-bold">
                 No uploads yet
               </h3>
 
               <p className="mt-2 text-gray-500">
-                Upload your first image to Heya.
+                Upload your first image or video to Heya.
               </p>
 
               <a
                 href="/upload"
                 className="mt-6 inline-block rounded-xl bg-black px-6 py-3 font-semibold text-white"
               >
-                Upload Image
+                Upload Media
               </a>
             </div>
           ) : (
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {images.map((image) => (
-                <div
-                  key={image.id}
-                  className="overflow-hidden rounded-2xl bg-white shadow-sm"
-                >
-                  {/* Image Preview */}
-                  <div className="flex h-64 items-center justify-center overflow-hidden bg-gray-200">
-                    {image.preview_url ? (
-                      <img
-                        src={image.preview_url}
-                        alt={image.title}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="px-6 text-center text-sm text-gray-500">
-                        Preview unavailable
+              {items.map((item) => {
+                const isVideo =
+                  item.media_type === "video";
+
+                return (
+                  <div
+                    key={item.id}
+                    className="overflow-hidden rounded-2xl bg-white shadow-sm"
+                  >
+                    <div className="flex h-64 items-center justify-center overflow-hidden bg-black">
+                      {item.preview_url ? (
+                        isVideo ? (
+                          <video
+                            src={item.preview_url}
+                            controls
+                            preload="metadata"
+                            className="h-full w-full object-contain"
+                          />
+                        ) : (
+                          <img
+                            src={item.preview_url}
+                            alt={item.title}
+                            className="h-full w-full object-cover"
+                          />
+                        )
+                      ) : (
+                        <div className="px-6 text-center text-sm text-gray-400">
+                          Preview unavailable
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="p-5">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <h3 className="font-bold">
+                            {item.title}
+                          </h3>
+
+                          <p className="mt-1 text-sm text-gray-500">
+                            {item.category}
+                          </p>
+
+                          <span className="mt-2 inline-block rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold capitalize text-gray-700">
+                            {isVideo ? "Video" : "Image"}
+                          </span>
+                        </div>
+
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-semibold capitalize ${getStatusStyle(
+                            item.status
+                          )}`}
+                        >
+                          {item.status}
+                        </span>
                       </div>
-                    )}
-                  </div>
 
-                  <div className="p-5">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <h3 className="font-bold">
-                          {image.title}
-                        </h3>
+                      {item.status === "pending" && (
+                        <div className="mt-4 rounded-xl bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
+                          Your submission is waiting for admin review.
+                        </div>
+                      )}
 
-                        <p className="mt-1 text-sm text-gray-500">
-                          {image.category}
+                      {item.status === "rejected" && (
+                        <div className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
+                          This submission was not approved.
+                        </div>
+                      )}
+
+                      <div className="mt-5 border-t pt-4">
+                        <p className="text-sm text-gray-500">
+                          Downloads: {item.downloads || 0}
+                        </p>
+
+                        <p className="mt-1 text-xs text-gray-400">
+                          Uploaded{" "}
+                          {new Date(
+                            item.created_at
+                          ).toLocaleDateString()}
                         </p>
                       </div>
 
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs font-semibold capitalize ${getStatusStyle(
-                          image.status
-                        )}`}
-                      >
-                        {image.status}
-                      </span>
+                      {item.status === "approved" &&
+                        item.image_url && (
+                          <a
+                            href={`/image/${item.id}`}
+                            className="mt-4 inline-block text-sm font-semibold underline"
+                          >
+                            View published{" "}
+                            {isVideo ? "video" : "image"}
+                          </a>
+                        )}
                     </div>
-
-                    {/* Pending message */}
-                    {image.status === "pending" && (
-                      <div className="mt-4 rounded-xl bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
-                        Your image is waiting for admin review.
-                      </div>
-                    )}
-
-                    {/* Rejected message */}
-                    {image.status === "rejected" && (
-                      <div className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
-                        This submission was not approved.
-                      </div>
-                    )}
-
-                    <div className="mt-5 border-t pt-4">
-                      <p className="text-sm text-gray-500">
-                        Downloads: {image.downloads || 0}
-                      </p>
-
-                      <p className="mt-1 text-xs text-gray-400">
-                        Uploaded{" "}
-                        {new Date(
-                          image.created_at
-                        ).toLocaleDateString()}
-                      </p>
-                    </div>
-
-                    {image.status === "approved" &&
-                      image.image_url && (
-                        <a
-                          href={`/image/${image.id}`}
-                          className="mt-4 inline-block text-sm font-semibold underline"
-                        >
-                          View published image
-                        </a>
-                      )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

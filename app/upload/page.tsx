@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
@@ -11,12 +11,13 @@ export default function UploadPage() {
   const [category, setCategory] = useState("");
   const [tags, setTags] = useState("");
   const [description, setDescription] = useState("");
-  const [imageFile, setImageFile] = useState<File | null>(null);
 
-  const [preview, setPreview] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [mediaType, setMediaType] = useState<"image" | "video">("image");
+
+  const [loading, setLoading] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
 
   const categories = [
     "Business",
@@ -36,47 +37,87 @@ export default function UploadPage() {
       } = await supabase.auth.getSession();
 
       if (!session) {
-        router.push("/login");
+        router.replace("/login");
         return;
       }
 
-      setLoading(false);
+      setCheckingAuth(false);
     };
 
     checkUser();
   }, [router]);
 
   useEffect(() => {
-    if (!imageFile) {
-      setPreview(null);
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = event.target.files?.[0];
+
+    if (!selectedFile) {
+      setFile(null);
+      setPreviewUrl(null);
       return;
     }
 
-    const objectUrl = URL.createObjectURL(imageFile);
-    setPreview(objectUrl);
+    const isImage = selectedFile.type.startsWith("image/");
+    const isVideo = selectedFile.type.startsWith("video/");
 
-    return () => {
-      URL.revokeObjectURL(objectUrl);
-    };
-  }, [imageFile]);
+    if (!isImage && !isVideo) {
+      alert("Please select an image or video file.");
+      event.target.value = "";
+      return;
+    }
 
-  const handleUpload = async (e: React.FormEvent) => {
-    e.preventDefault();
+    // Images: maximum 10 MB
+    if (isImage && selectedFile.size > 10 * 1024 * 1024) {
+      alert("Images must be 10 MB or smaller.");
+      event.target.value = "";
+      return;
+    }
 
-    setErrorMessage("");
+    // Videos: maximum 25 MB
+    if (isVideo && selectedFile.size > 25 * 1024 * 1024) {
+      alert("Videos must be 25 MB or smaller.");
+      event.target.value = "";
+      return;
+    }
 
-    if (!imageFile) {
-      setErrorMessage("Please select an image.");
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
+
+    const newPreviewUrl = URL.createObjectURL(selectedFile);
+
+    setFile(selectedFile);
+    setPreviewUrl(newPreviewUrl);
+    setMediaType(isVideo ? "video" : "image");
+  };
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!title.trim()) {
+      alert("Please enter a title.");
       return;
     }
 
     if (!category) {
-      setErrorMessage("Please select a category.");
+      alert("Please select a category.");
+      return;
+    }
+
+    if (!file) {
+      alert("Please choose an image or video.");
       return;
     }
 
     try {
-      setUploading(true);
+      setLoading(true);
 
       const {
         data: { user },
@@ -87,40 +128,46 @@ export default function UploadPage() {
         throw new Error("You must be logged in to upload.");
       }
 
-      const originalExtension =
-        imageFile.name.split(".").pop()?.toLowerCase() || "jpg";
+      const extension =
+        file.name.split(".").pop()?.toLowerCase() ||
+        (mediaType === "video" ? "mp4" : "jpg");
 
-      const safeFileName = `${Date.now()}-${Math.random()
-        .toString(36)
-        .substring(2)}.${originalExtension}`;
+      const cleanTitle = title
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
 
-      // Each contributor gets their own private folder
-      const filePath = `${user.id}/${safeFileName}`;
+      const safeFileName = `${
+        cleanTitle || mediaType
+      }-${Date.now()}.${extension}`;
 
-      // Upload to PRIVATE submissions bucket
-      const { error: storageError } = await supabase.storage
+      const storagePath = `${user.id}/${safeFileName}`;
+
+      // Upload privately first
+      const { error: uploadError } = await supabase.storage
         .from("submissions")
-        .upload(filePath, imageFile, {
+        .upload(storagePath, file, {
           cacheControl: "3600",
           upsert: false,
-          contentType: imageFile.type,
+          contentType: file.type,
         });
 
-      if (storageError) {
-        throw storageError;
+      if (uploadError) {
+        throw uploadError;
       }
 
-      // Store only the private path in the database.
-      // No public URL is created while the image is pending.
+      // Insert pending database record
       const { error: databaseError } = await supabase
         .from("images")
         .insert({
           title: title.trim(),
           category,
-          tags: tags.trim(),
-          description: description.trim(),
+          tags: tags.trim() || null,
+          description: description.trim() || null,
           image_url: null,
-          storage_path: filePath,
+          storage_path: storagePath,
+          media_type: mediaType,
           downloads: 0,
           featured: false,
           user_id: user.id,
@@ -128,16 +175,13 @@ export default function UploadPage() {
         });
 
       if (databaseError) {
-        console.error(
-          "Image uploaded to storage but database insert failed:",
-          databaseError
-        );
-
         throw databaseError;
       }
 
       alert(
-        "Image uploaded successfully! It has been sent for admin review."
+        mediaType === "video"
+          ? "Video uploaded successfully! It is waiting for admin approval."
+          : "Image uploaded successfully! It is waiting for admin approval."
       );
 
       router.push("/dashboard");
@@ -145,21 +189,22 @@ export default function UploadPage() {
     } catch (error: unknown) {
       console.error("Upload failed:", error);
 
-      setErrorMessage(
+      const message =
         error instanceof Error
           ? error.message
-          : "Upload failed. Please try again."
-      );
+          : "Something went wrong";
+
+      alert(`Upload failed: ${message}`);
     } finally {
-      setUploading(false);
+      setLoading(false);
     }
   };
 
-  if (loading) {
+  if (checkingAuth) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-gray-50 text-black">
         <p className="text-lg font-semibold">
-          Loading upload page...
+          Checking authentication...
         </p>
       </main>
     );
@@ -173,151 +218,199 @@ export default function UploadPage() {
             Heya
           </a>
 
-          <a
-            href="/dashboard"
-            className="rounded-full border px-5 py-2 text-sm font-semibold transition hover:bg-gray-100"
-          >
-            Back to Dashboard
-          </a>
+          <div className="flex items-center gap-4">
+            <a
+              href="/dashboard"
+              className="text-sm font-semibold text-gray-600"
+            >
+              Dashboard
+            </a>
+
+            <a
+              href="/"
+              className="rounded-full border px-5 py-2 text-sm font-semibold"
+            >
+              Explore
+            </a>
+          </div>
         </div>
       </header>
 
-      <section className="mx-auto max-w-3xl px-6 py-12">
-        <div className="rounded-2xl bg-white p-8 shadow-sm">
-          <div className="mb-8">
-            <p className="text-sm font-semibold uppercase tracking-wider text-gray-500">
-              Contributor Upload
-            </p>
+      <section className="mx-auto max-w-4xl px-6 py-12">
+        <div className="mb-8">
+          <p className="text-sm font-semibold uppercase tracking-wider text-gray-500">
+            Contributor Upload
+          </p>
 
-            <h1 className="mt-2 text-3xl font-bold">
-              Upload an Image
-            </h1>
+          <h1 className="mt-2 text-4xl font-black">
+            Upload to Heya
+          </h1>
 
-            <p className="mt-3 text-gray-500">
-              Submit your image to Heya. It will remain private until it is
-              reviewed and approved.
-            </p>
-          </div>
+          <p className="mt-3 text-gray-600">
+            Submit your photos or videos for review.
+          </p>
+        </div>
 
-          <form onSubmit={handleUpload} className="space-y-6">
-            <div>
-              <label className="mb-2 block font-semibold">
-                Image
-              </label>
+        <form
+          onSubmit={handleSubmit}
+          className="rounded-3xl bg-white p-6 shadow-sm sm:p-8"
+        >
+          <div>
+            <label className="mb-2 block text-sm font-semibold">
+              Photo or Video
+            </label>
+
+            <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-300 px-6 py-10 text-center transition hover:border-black">
+              <span className="text-3xl">
+                {mediaType === "video" ? "🎬" : "📷"}
+              </span>
+
+              <span className="mt-3 font-bold">
+                Choose an image or video
+              </span>
+
+              <span className="mt-2 text-sm text-gray-500">
+                Images up to 10 MB • Videos up to 25 MB
+              </span>
+
+              <span className="mt-1 text-xs text-gray-400">
+                JPG, PNG, WEBP, MP4 or WEBM
+              </span>
 
               <input
                 type="file"
-                accept="image/*"
-                required
-                onChange={(e) =>
-                  setImageFile(e.target.files?.[0] || null)
-                }
-                className="w-full rounded-xl border px-4 py-3"
+                accept="image/jpeg,image/png,image/webp,video/mp4,video/webm"
+                onChange={handleFileChange}
+                className="hidden"
               />
-            </div>
+            </label>
+          </div>
 
-            {preview && (
-              <div className="overflow-hidden rounded-2xl border bg-gray-100">
-                <img
-                  src={preview}
-                  alt="Upload preview"
-                  className="max-h-[450px] w-full object-contain"
+          {previewUrl && file && (
+            <div className="mt-6 overflow-hidden rounded-2xl bg-black">
+              {mediaType === "video" ? (
+                <video
+                  src={previewUrl}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  className="max-h-[500px] w-full object-contain"
                 />
+              ) : (
+                <img
+                  src={previewUrl}
+                  alt="Upload preview"
+                  className="max-h-[500px] w-full object-contain"
+                />
+              )}
+
+              <div className="bg-gray-900 px-4 py-3 text-sm text-white">
+                <p className="truncate font-semibold">
+                  {file.name}
+                </p>
+
+                <p className="mt-1 text-xs text-gray-400">
+                  {mediaType === "video" ? "Video" : "Image"} •{" "}
+                  {(file.size / 1024 / 1024).toFixed(2)} MB
+                </p>
               </div>
-            )}
-
-            <div>
-              <label className="mb-2 block font-semibold">
-                Title
-              </label>
-
-              <input
-                type="text"
-                placeholder="Example: Modern office workspace"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                required
-                className="w-full rounded-xl border px-4 py-3 outline-none focus:border-black"
-              />
             </div>
+          )}
 
-            <div>
-              <label className="mb-2 block font-semibold">
-                Category
-              </label>
+          <div className="mt-8">
+            <label className="mb-2 block text-sm font-semibold">
+              Title
+            </label>
 
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                required
-                className="w-full rounded-xl border bg-white px-4 py-3 outline-none focus:border-black"
-              >
-                <option value="">
-                  Select category
-                </option>
+            <input
+              type="text"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              placeholder="Example: Sunset over the mountains"
+              className="w-full rounded-xl border px-4 py-3 outline-none focus:border-black"
+            />
+          </div>
 
-                {categories.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div className="mt-5">
+            <label className="mb-2 block text-sm font-semibold">
+              Category
+            </label>
 
-            <div>
-              <label className="mb-2 block font-semibold">
-                Tags
-              </label>
-
-              <input
-                type="text"
-                placeholder="office, business, laptop, workspace"
-                value={tags}
-                onChange={(e) => setTags(e.target.value)}
-                className="w-full rounded-xl border px-4 py-3 outline-none focus:border-black"
-              />
-
-              <p className="mt-2 text-xs text-gray-500">
-                Separate tags using commas.
-              </p>
-            </div>
-
-            <div>
-              <label className="mb-2 block font-semibold">
-                Description
-              </label>
-
-              <textarea
-                placeholder="Write a short description about the image..."
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={5}
-                className="w-full resize-none rounded-xl border px-4 py-3 outline-none focus:border-black"
-              />
-            </div>
-
-            {errorMessage && (
-              <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">
-                {errorMessage}
-              </div>
-            )}
-
-            <div className="rounded-xl bg-yellow-50 px-4 py-4 text-sm text-yellow-800">
-              Your submission is stored privately and will only become public
-              after Heya approves it.
-            </div>
-
-            <button
-              type="submit"
-              disabled={uploading}
-              className="w-full rounded-xl bg-black px-6 py-4 font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-400"
+            <select
+              value={category}
+              onChange={(event) => setCategory(event.target.value)}
+              className="w-full rounded-xl border bg-white px-4 py-3 outline-none focus:border-black"
             >
-              {uploading
-                ? "Uploading..."
-                : "Submit Image for Review"}
-            </button>
-          </form>
-        </div>
+              <option value="">
+                Select category
+              </option>
+
+              {categories.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="mt-5">
+            <label className="mb-2 block text-sm font-semibold">
+              Tags
+            </label>
+
+            <input
+              type="text"
+              value={tags}
+              onChange={(event) => setTags(event.target.value)}
+              placeholder="nature, sunset, mountains, travel"
+              className="w-full rounded-xl border px-4 py-3 outline-none focus:border-black"
+            />
+
+            <p className="mt-2 text-xs text-gray-400">
+              Separate keywords with commas.
+            </p>
+          </div>
+
+          <div className="mt-5">
+            <label className="mb-2 block text-sm font-semibold">
+              Description
+            </label>
+
+            <textarea
+              value={description}
+              onChange={(event) =>
+                setDescription(event.target.value)
+              }
+              placeholder="Describe your photo or video..."
+              rows={5}
+              className="w-full resize-none rounded-xl border px-4 py-3 outline-none focus:border-black"
+            />
+          </div>
+
+          <div className="mt-8 rounded-2xl bg-gray-50 p-4 text-sm text-gray-600">
+            <p className="font-semibold text-black">
+              Before uploading
+            </p>
+
+            <p className="mt-2 leading-6">
+              Upload only content you created or have permission to
+              distribute. Every submission is reviewed before it becomes
+              publicly available on Heya.
+            </p>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="mt-8 w-full rounded-xl bg-black px-6 py-4 font-bold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-400"
+          >
+            {loading
+              ? "Uploading..."
+              : mediaType === "video"
+              ? "Submit Video for Review"
+              : "Submit Image for Review"}
+          </button>
+        </form>
       </section>
     </main>
   );
