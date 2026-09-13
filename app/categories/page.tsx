@@ -1,81 +1,117 @@
-"use client";
+import type { Metadata } from "next";
+import { createClient } from "@supabase/supabase-js";
 
-import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/lib/supabase";
-
-type ImageItem = {
+export const dynamic = "force-dynamic";
+type MediaItem = {
   id: number;
   title: string;
   category: string;
   image_url: string;
   status: string;
+  media_type: string | null;
 };
 
-export default function CategoriesPage() {
-  const [images, setImages] = useState<ImageItem[]>([]);
-  const [loading, setLoading] = useState(true);
+type CategoryItem = {
+  name: string;
+  count: number;
+  previewUrl: string;
+  previewType: string | null;
+};
 
-  useEffect(() => {
-    const fetchImages = async () => {
-      setLoading(true);
+const baseUrl = "https://heya-stock.vercel.app";
 
-      const { data, error } = await supabase
-        .from("images")
-        .select("id, title, category, image_url, status")
-        .eq("status", "approved")
-        .order("created_at", { ascending: false });
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  {
+    auth: {
+      persistSession: false,
+    },
+  }
+);
 
-      if (error) {
-        console.error("Failed to load categories:", error);
-        setImages([]);
-        setLoading(false);
-        return;
-      }
+export const metadata: Metadata = {
+  title: "Browse Stock Photo & Video Categories",
 
-      setImages(data || []);
-      setLoading(false);
-    };
+  description:
+    "Browse free stock photo and video categories on Heya, including travel, technology, business and more.",
 
-    fetchImages();
-  }, []);
+  alternates: {
+    canonical: "/categories",
+  },
 
-  const categories = useMemo(() => {
-    const map = new Map<
-      string,
-      {
-        name: string;
-        count: number;
-        previewImage: string;
-      }
-    >();
+  openGraph: {
+    title: "Browse Stock Photo & Video Categories | Heya",
+    description:
+      "Explore free stock photos and videos by category on Heya.",
+    url: `${baseUrl}/categories`,
+    siteName: "Heya",
+    type: "website",
+  },
 
-    images.forEach((image) => {
-      const category = image.category?.trim();
+  twitter: {
+    card: "summary_large_image",
+    title: "Browse Stock Photo & Video Categories | Heya",
+    description:
+      "Explore free stock photos and videos by category on Heya.",
+  },
 
-      if (!category) return;
+  robots: {
+    index: true,
+    follow: true,
+  },
+};
 
-      if (!map.has(category)) {
-        map.set(category, {
-          name: category,
-          count: 1,
-          previewImage: image.image_url,
-        });
-      } else {
-        const current = map.get(category);
+async function getCategories(): Promise<CategoryItem[]> {
+  const { data, error } = await supabase
+    .from("images")
+    .select(
+      "id, title, category, image_url, status, media_type"
+    )
+    .eq("status", "approved")
+    .order("created_at", { ascending: false });
 
-        if (current) {
-          current.count += 1;
-        }
-      }
-    });
+  if (error) {
+    console.error("Failed to load categories:", error);
+    return [];
+  }
 
-    return Array.from(map.values()).sort((a, b) =>
-      a.name.localeCompare(b.name)
-    );
-  }, [images]);
+  const media = (data || []) as MediaItem[];
 
-  const makeSlug = (category: string) =>
-    encodeURIComponent(category.toLowerCase().replace(/\s+/g, "-"));
+  const map = new Map<string, CategoryItem>();
+
+  media.forEach((item) => {
+    const category = item.category?.trim();
+
+    if (!category) return;
+
+    const current = map.get(category);
+
+    if (!current) {
+      map.set(category, {
+        name: category,
+        count: 1,
+        previewUrl: item.image_url,
+        previewType: item.media_type,
+      });
+    } else {
+      current.count += 1;
+    }
+  });
+
+  return Array.from(map.values()).sort((a, b) =>
+    a.name.localeCompare(b.name)
+  );
+}
+
+function makeSlug(category: string) {
+  return encodeURIComponent(
+    category.toLowerCase().replace(/\s+/g, "-")
+  );
+}
+
+export default async function CategoriesPage() {
+  const categories = await getCategories();
 
   return (
     <main className="min-h-screen bg-white text-black">
@@ -96,62 +132,79 @@ export default function CategoriesPage() {
       <section className="mx-auto max-w-7xl px-6 py-14">
         <div className="mb-10">
           <h1 className="text-4xl font-bold">
-            Browse Categories
+            Browse Stock Photo & Video Categories
           </h1>
 
-          <p className="mt-3 text-gray-600">
-            Explore free stock images by category.
+          <p className="mt-3 max-w-2xl text-gray-600">
+            Explore free stock photos and videos by category.
           </p>
         </div>
 
-        {loading && (
-          <div className="py-16 text-center">
-            <p className="text-gray-500">
-              Loading categories...
-            </p>
-          </div>
-        )}
-
-        {!loading && categories.length === 0 && (
+        {categories.length === 0 && (
           <div className="rounded-2xl bg-gray-50 px-6 py-16 text-center">
             <h2 className="text-xl font-bold">
               No categories yet
             </h2>
 
             <p className="mt-2 text-gray-500">
-              Approved images will appear here automatically.
+              Approved photos and videos will appear here automatically.
             </p>
           </div>
         )}
 
-        {!loading && categories.length > 0 && (
+        {categories.length > 0 && (
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {categories.map((category) => (
-              <a
-                key={category.name}
-                href={`/categories/${makeSlug(category.name)}`}
-                className="group overflow-hidden rounded-2xl border bg-white transition hover:-translate-y-1 hover:shadow-lg"
-              >
-                <div className="h-56 overflow-hidden bg-gray-200">
-                  <img
-                    src={category.previewImage}
-                    alt={`${category.name} stock images`}
-                    className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                  />
-                </div>
+            {categories.map((category) => {
+              const isVideo =
+                category.previewType === "video";
 
-                <div className="p-5">
-                  <h2 className="text-xl font-bold">
-                    {category.name}
-                  </h2>
+              return (
+                <a
+                  key={category.name}
+                  href={`/categories/${makeSlug(
+                    category.name
+                  )}`}
+                  className="group overflow-hidden rounded-2xl border bg-white transition hover:-translate-y-1 hover:shadow-lg"
+                >
+                  <div className="relative h-56 overflow-hidden bg-gray-200">
+                    {isVideo ? (
+                      <>
+                        <video
+                          src={category.previewUrl}
+                          muted
+                          playsInline
+                          preload="metadata"
+                          className="h-full w-full object-cover"
+                        />
 
-                  <p className="mt-1 text-sm text-gray-500">
-                    {category.count}{" "}
-                    {category.count === 1 ? "image" : "images"}
-                  </p>
-                </div>
-              </a>
-            ))}
+                        <span className="absolute bottom-3 left-3 rounded-full bg-black/75 px-3 py-1 text-xs font-semibold text-white">
+                          Video
+                        </span>
+                      </>
+                    ) : (
+                      <img
+                        src={category.previewUrl}
+                        alt={`${category.name} stock photos and videos`}
+                        className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                      />
+                    )}
+                  </div>
+
+                  <div className="p-5">
+                    <h2 className="text-xl font-bold">
+                      {category.name}
+                    </h2>
+
+                    <p className="mt-1 text-sm text-gray-500">
+                      {category.count}{" "}
+                      {category.count === 1
+                        ? "media item"
+                        : "media items"}
+                    </p>
+                  </div>
+                </a>
+              );
+            })}
           </div>
         )}
       </section>
