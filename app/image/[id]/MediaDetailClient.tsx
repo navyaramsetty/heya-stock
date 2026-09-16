@@ -1,5 +1,8 @@
 "use client";
 
+import Link from "next/link";
+import StockImage from "@/components/StockImage";
+import { categorySlug as makeCategorySlug } from "@/lib/seo";
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 
@@ -16,9 +19,10 @@ type MediaItem = {
 };
 
 export default function MediaDetailClient({
-  initialMedia,
+  initialMedia, poster,
 }: {
   initialMedia: MediaItem;
+  poster: string | null;
 }) {
   const [media, setMedia] = useState<MediaItem>(initialMedia);
   const [downloading, setDownloading] = useState(false);
@@ -116,21 +120,22 @@ export default function MediaDetailClient({
         .filter(Boolean)
     : [];
 
-  const categorySlug = encodeURIComponent(
-    media.category
-      .toLowerCase()
-      .trim()
-      .replace(/\s+/g, "-")
-  );
+  const categorySlug = makeCategorySlug(media.category);
 
   return (
     <main className="min-h-screen bg-gray-50 text-black">
       <section className="mx-auto grid max-w-7xl gap-10 px-6 py-12 lg:grid-cols-2">
+        <nav aria-label="Breadcrumb" className="flex flex-wrap gap-2 text-sm lg:col-span-2">
+          <Link prefetch={false} href="/">Home</Link><span aria-hidden="true">/</span>
+          <Link prefetch={false} href={"/categories/" + categorySlug}>{media.category}</Link><span aria-hidden="true">/</span>
+          <span aria-current="page">{media.title}</span>
+        </nav>
         {/* Preview */}
-        <div className="flex min-h-[400px] items-center justify-center overflow-hidden rounded-2xl bg-black">
+        <div className="relative flex aspect-[4/3] items-center justify-center overflow-hidden rounded-2xl bg-black">
           {isVideo ? (
             <video
               src={media.image_url}
+              poster={poster || undefined}
               controls
               playsInline
               preload="metadata"
@@ -139,9 +144,9 @@ export default function MediaDetailClient({
               Your browser does not support video playback.
             </video>
           ) : (
-            <img
+            <StockImage eager sizes="(max-width: 1024px) 100vw, 50vw"
               src={media.image_url}
-              alt={`${media.title} free stock photo`}
+              alt={media.title}
               className="max-h-[750px] w-full object-contain"
             />
           )}
@@ -149,12 +154,12 @@ export default function MediaDetailClient({
 
         {/* Information */}
         <div className="flex flex-col justify-center">
-          <a
+          <Link prefetch={false}
             href="/"
             className="mb-6 inline-block text-sm font-semibold text-gray-500 transition hover:text-black"
           >
             ← Back to Explore
-          </a>
+          </Link>
 
           <p className="mb-3 text-sm font-bold uppercase tracking-wider text-gray-500">
             {isVideo ? "Free Stock Video" : "Free Stock Photo"}
@@ -165,12 +170,12 @@ export default function MediaDetailClient({
           </h1>
 
           {/* Category */}
-          <a
+          <Link prefetch={false}
             href={`/categories/${categorySlug}`}
             className="mt-3 inline-block text-sm font-semibold text-gray-500 transition hover:text-black"
           >
             {media.category}
-          </a>
+          </Link>
 
           {/* Description */}
           {media.description && (
@@ -219,7 +224,8 @@ export default function MediaDetailClient({
             </p>
 
             <p className="mt-2 text-sm text-gray-500">
-              Free to download for creative projects.
+              Free to download for creative projects.{" "}
+              <Link prefetch={false} href="/license" className="underline">Read the Heya License</Link>.
             </p>
           </div>
         </div>

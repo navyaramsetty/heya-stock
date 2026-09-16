@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { createVideoPoster } from "@/lib/create-video-poster";
 import { supabase } from "@/lib/supabase";
 
 type MediaItem = {
@@ -23,30 +25,9 @@ export default function AdminMediaPage() {
   const [items, setItems] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [posterId, setPosterId] = useState<number | null>(null);
 
-  useEffect(() => {
-    const initialize = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session) {
-        router.replace("/admin/login");
-        return;
-      }
-
-      if (session.user.email !== "navyaramsetty@gmail.com") {
-        router.replace("/");
-        return;
-      }
-
-      await loadMedia();
-    };
-
-    initialize();
-  }, [router]);
-
-  const loadMedia = async () => {
+  const loadMedia = useCallback(async () => {
     setLoading(true);
 
     const { data, error } = await supabase
@@ -94,7 +75,31 @@ export default function AdminMediaPage() {
 
     setItems(itemsWithPreviews);
     setLoading(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    const initialize = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        router.replace("/admin/login");
+        return;
+      }
+
+      if (session.user.email !== "navyaramsetty@gmail.com") {
+        router.replace("/");
+        return;
+      }
+
+      await loadMedia();
+    };
+
+    initialize();
+  }, [router, loadMedia]);
+
+
 
   const getPublicStoragePath = (publicUrl: string | null) => {
     if (!publicUrl) return null;
@@ -118,6 +123,24 @@ export default function AdminMediaPage() {
     }
   };
 
+
+  const generatePoster = async (item: MediaItem) => {
+    try {
+      setPosterId(item.id);
+      const prefix = process.env.NEXT_PUBLIC_SUPABASE_URL + "/storage/v1/object/public/images/";
+      if (!item.image_url?.startsWith(prefix)) throw new Error("Re-upload this video to create its preview.");
+      const response = await fetch(item.image_url);
+      if (!response.ok) throw new Error("Unable to read video.");
+      const poster = await createVideoPoster(await response.blob());
+      const path = decodeURIComponent(item.image_url.slice(prefix.length)) + ".poster.jpg";
+      const { error } = await supabase.storage.from("images").upload(path, poster, { contentType: "image/jpeg", upsert: true });
+      if (error) throw error;
+      alert("Video preview saved. Search and sharing metadata refresh within five minutes.");
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Unable to save video preview.");
+    } finally { setPosterId(null); }
+  };
+
   const deleteMedia = async (item: MediaItem) => {
     const confirmed = window.confirm(
       `Delete "${item.title}" permanently?\n\nThis will remove the database record and associated storage files. This action cannot be undone.`
@@ -137,7 +160,7 @@ export default function AdminMediaPage() {
         const { error: publicDeleteError } =
           await supabase.storage
             .from("images")
-            .remove([publicStoragePath]);
+            .remove(item.media_type === "video" ? [publicStoragePath, publicStoragePath + ".poster.jpg"] : [publicStoragePath]);
 
         if (publicDeleteError) {
           throw new Error(
@@ -214,24 +237,24 @@ export default function AdminMediaPage() {
     <main className="min-h-screen bg-gray-100 text-black">
       <header className="border-b bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <a href="/" className="text-2xl font-black">
+          <Link prefetch={false} href="/" className="text-2xl font-black">
             Heya
-          </a>
+          </Link>
 
           <div className="flex items-center gap-3">
-            <a
+            <Link prefetch={false}
               href="/admin/review"
               className="rounded-full border px-4 py-2 text-sm font-semibold"
             >
               Review
-            </a>
+            </Link>
 
-            <a
+            <Link prefetch={false}
               href="/admin"
               className="rounded-full border px-4 py-2 text-sm font-semibold"
             >
               Upload
-            </a>
+            </Link>
 
             <button
               onClick={handleLogout}
@@ -342,9 +365,15 @@ export default function AdminMediaPage() {
                       ).toLocaleDateString()}
                     </p>
 
+                    {isVideo && item.status === "approved" && (
+                      <button onClick={() => generatePoster(item)} disabled={posterId === item.id || deletingId === item.id}
+                        className="mt-5 w-full rounded-xl border px-4 py-3 font-semibold disabled:opacity-50">
+                        {posterId === item.id ? "Creating preview..." : "Create video preview"}
+                      </button>
+                    )}
                     <button
                       onClick={() => deleteMedia(item)}
-                      disabled={deletingId === item.id}
+                      disabled={deletingId === item.id || posterId === item.id}
                       className="mt-5 w-full rounded-xl bg-red-600 px-4 py-3 font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-red-300"
                     >
                       {deletingId === item.id

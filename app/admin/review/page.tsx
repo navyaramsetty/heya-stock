@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { createVideoPoster } from "@/lib/create-video-poster";
 import { supabase } from "@/lib/supabase";
 
 type ImageItem = {
@@ -12,6 +14,7 @@ type ImageItem = {
   description: string | null;
   image_url: string | null;
   storage_path: string | null;
+  media_type: string | null;
   status: string;
   user_id: string | null;
   created_at: string;
@@ -26,32 +29,13 @@ export default function ReviewPage() {
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
 
-  useEffect(() => {
-    const initialize = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session) {
-        router.replace("/admin/login");
-        return;
-      }
-
-      setCheckingAuth(false);
-
-      await fetchPendingImages();
-    };
-
-    initialize();
-  }, [router]);
-
-  const fetchPendingImages = async () => {
+  const fetchPendingImages = useCallback(async () => {
     setLoading(true);
 
     const { data, error } = await supabase
       .from("images")
       .select(
-        "id, title, category, tags, description, image_url, storage_path, status, user_id, created_at"
+        "id, title, category, tags, description, image_url, storage_path, media_type, status, user_id, created_at"
       )
       .eq("status", "pending")
       .order("created_at", { ascending: false });
@@ -109,7 +93,28 @@ export default function ReviewPage() {
 
     setImages(imagesWithPreviews);
     setLoading(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    const initialize = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        router.replace("/admin/login");
+        return;
+      }
+
+      setCheckingAuth(false);
+
+      await fetchPendingImages();
+    };
+
+    initialize();
+  }, [router, fetchPendingImages]);
+
+
 
   const approveImage = async (image: ImageItem) => {
     try {
@@ -118,6 +123,16 @@ export default function ReviewPage() {
       // OLD uploads:
       // already have a public image URL, so we only need to approve them.
       if (image.image_url && !image.storage_path) {
+        if (image.media_type === "video") {
+          const prefix = process.env.NEXT_PUBLIC_SUPABASE_URL + "/storage/v1/object/public/images/";
+          if (!image.image_url.startsWith(prefix)) throw new Error("Re-upload this video to create its preview.");
+          const response = await fetch(image.image_url);
+          if (!response.ok) throw new Error("Unable to read video.");
+          const poster = await createVideoPoster(await response.blob());
+          const { error: posterError } = await supabase.storage.from("images")
+            .upload(decodeURIComponent(image.image_url.slice(prefix.length)) + ".poster.jpg", poster, { contentType: "image/jpeg", upsert: true });
+          if (posterError) throw posterError;
+        }
         const { error } = await supabase
           .from("images")
           .update({
@@ -170,7 +185,7 @@ export default function ReviewPage() {
 
       // Store approved images under the admin's folder.
       // This works with your current public images storage policy.
-      const publicFileName = `approved-${image.id}-${Date.now()}.${extension}`;
+      const publicFileName = `approved-${image.id}-${crypto.randomUUID()}.${extension}`;
 
       const publicFilePath = `${adminUser.id}/${publicFileName}`;
 
@@ -192,6 +207,22 @@ export default function ReviewPage() {
         .from("images")
         .getPublicUrl(publicFilePath);
 
+      // Publish only after a real thumbnail is available for video SEO and sharing.
+      const publicPaths = [publicFilePath];
+      if (image.media_type === "video") {
+        try {
+          const poster = await createVideoPoster(privateFile);
+          const posterPath = publicFilePath + ".poster.jpg";
+          const { error: posterError } = await supabase.storage.from("images")
+            .upload(posterPath, poster, { contentType: "image/jpeg", cacheControl: "31536000", upsert: false });
+          if (posterError) throw posterError;
+          publicPaths.push(posterPath);
+        } catch (error) {
+          await supabase.storage.from("images").remove(publicPaths);
+          throw error;
+        }
+      }
+
       // Publish the database record
       const { error: updateError } = await supabase
         .from("images")
@@ -205,7 +236,7 @@ export default function ReviewPage() {
       if (updateError) {
         await supabase.storage
           .from("images")
-          .remove([publicFilePath]);
+          .remove(publicPaths);
 
         throw updateError;
       }
@@ -284,17 +315,17 @@ export default function ReviewPage() {
     <main className="min-h-screen bg-gray-100 text-black">
       <header className="border-b bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <a href="/" className="text-2xl font-bold">
+          <Link prefetch={false} href="/" className="text-2xl font-bold">
             Heya
-          </a>
+          </Link>
 
           <div className="flex items-center gap-3">
-            <a
+            <Link prefetch={false}
               href="/admin"
               className="rounded-full border px-5 py-2 text-sm font-semibold"
             >
               Upload
-            </a>
+            </Link>
 
             <button
               onClick={handleLogout}
@@ -335,7 +366,7 @@ export default function ReviewPage() {
             </h2>
 
             <p className="mt-2 text-gray-500">
-              You're all caught up.
+              You&apos;re all caught up.
             </p>
           </div>
         ) : (
@@ -346,7 +377,9 @@ export default function ReviewPage() {
                 className="overflow-hidden rounded-2xl bg-white shadow-sm"
               >
                 <div className="flex h-72 items-center justify-center overflow-hidden bg-gray-200">
-                  {image.preview_url ? (
+                  {image.preview_url ? image.media_type === "video" ? (
+                    <video src={image.preview_url} controls preload="metadata" className="h-full w-full object-contain" />
+                  ) : (
                     <img
                       src={image.preview_url}
                       alt={image.title}

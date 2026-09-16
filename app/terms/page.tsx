@@ -1,29 +1,7 @@
-import type { Metadata } from "next";
+import Link from "next/link";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Terms & Conditions",
-
-  description:
-    "Read the Heya Terms & Conditions covering use of the platform, contributor uploads, downloads, content rights and acceptable use.",
-
-  alternates: {
-    canonical: "/terms",
-  },
-
-  openGraph: {
-    title: "Terms & Conditions | Heya",
-    description:
-      "Read the terms that apply when browsing, downloading or contributing stock photos and videos on Heya.",
-    url: "https://heya-stock.vercel.app/terms",
-    siteName: "Heya",
-    type: "website",
-  },
-
-  robots: {
-    index: true,
-    follow: true,
-  },
-};
+export const metadata = pageMetadata("Terms & Conditions", "Read the Heya Terms & Conditions covering use of the platform, contributor uploads, downloads, content rights and acceptable use.", "/terms");
 
 export default function TermsPage() {
   return (
@@ -264,12 +242,12 @@ export default function TermsPage() {
               contact Heya through the Contact page.
             </p>
 
-            <a
+            <Link prefetch={false}
               href="/contact"
               className="mt-4 inline-block font-semibold text-black underline"
             >
               Contact Heya
-            </a>
+            </Link>
           </section>
         </div>
       </section>

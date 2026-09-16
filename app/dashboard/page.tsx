@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -160,24 +161,24 @@ export default function DashboardPage() {
     <main className="min-h-screen bg-gray-50 text-black">
       <header className="border-b bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <a href="/" className="text-2xl font-bold">
+          <Link prefetch={false} href="/" className="text-2xl font-bold">
             Heya
-          </a>
+          </Link>
 
           <div className="flex items-center gap-4">
-            <a
+            <Link prefetch={false}
               href="/"
               className="hidden text-sm font-semibold text-gray-600 sm:block"
             >
               Explore
-            </a>
+            </Link>
 
-            <a
+            <Link prefetch={false}
               href="/upload"
               className="hidden text-sm font-semibold text-gray-600 sm:block"
             >
               Upload
-            </a>
+            </Link>
 
             <button
               onClick={handleLogout}
@@ -205,12 +206,12 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          <a
+          <Link prefetch={false}
             href="/upload"
             className="inline-flex items-center justify-center rounded-xl bg-black px-6 py-3 font-semibold text-white transition hover:bg-gray-800"
           >
             + Upload Media
-          </a>
+          </Link>
         </div>
 
         <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
@@ -287,12 +288,12 @@ export default function DashboardPage() {
                 Upload your first image or video to Heya.
               </p>
 
-              <a
+              <Link prefetch={false}
                 href="/upload"
                 className="mt-6 inline-block rounded-xl bg-black px-6 py-3 font-semibold text-white"
               >
                 Upload Media
-              </a>
+              </Link>
             </div>
           ) : (
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -380,13 +381,13 @@ export default function DashboardPage() {
 
                       {item.status === "approved" &&
                         item.image_url && (
-                          <a
+                          <Link prefetch={false}
                             href={`/image/${item.id}`}
                             className="mt-4 inline-block text-sm font-semibold underline"
                           >
                             View published{" "}
                             {isVideo ? "video" : "image"}
-                          </a>
+                          </Link>
                         )}
                     </div>
                   </div>

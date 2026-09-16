@@ -1,36 +1,11 @@
-import type { Metadata } from "next";
+import Link from "next/link";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "About Heya - Free Stock Photos & Videos",
-
-  description:
-    "Learn about Heya, a growing platform for discovering and downloading free stock photos and videos for websites, social media, marketing, design and creative projects.",
-
-  alternates: {
-    canonical: "/about",
-  },
-
-  openGraph: {
-    title: "About Heya - Free Stock Photos & Videos",
-    description:
-      "Learn about Heya and our mission to make useful stock photos and videos easier to discover and download.",
-    url: "https://heya-stock.vercel.app/about",
-    siteName: "Heya",
-    type: "website",
-  },
-
-  twitter: {
-    card: "summary_large_image",
-    title: "About Heya - Free Stock Photos & Videos",
-    description:
-      "Learn about Heya and our mission to make useful stock photos and videos easier to discover and download.",
-  },
-
-  robots: {
-    index: true,
-    follow: true,
-  },
-};
+export const metadata = pageMetadata(
+  "About",
+  "Learn about Heya, a growing platform for discovering and downloading free stock photos and videos for websites, social media, marketing, design and creative projects.",
+  "/about"
+);
 
 export default function AboutPage() {
   return (
@@ -120,12 +95,13 @@ export default function AboutPage() {
             and convenient.
           </p>
 
-          <a
+          <Link
+            prefetch={false}
             href="/"
             className="mt-8 inline-block rounded-xl bg-white px-6 py-3 font-semibold text-black transition hover:bg-gray-200"
           >
             Explore Stock Media
-          </a>
+          </Link>
         </div>
       </section>
     </main>

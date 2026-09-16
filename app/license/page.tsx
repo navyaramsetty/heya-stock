@@ -1,29 +1,7 @@
-import type { Metadata } from "next";
+import Link from "next/link";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Heya License",
-
-  description:
-    "Read the Heya License to understand how stock photos and videos downloaded from Heya may be used.",
-
-  alternates: {
-    canonical: "/license",
-  },
-
-  openGraph: {
-    title: "Heya License",
-    description:
-      "Learn how free stock photos and videos from Heya may be used in creative, commercial and personal projects.",
-    url: "https://heya-stock.vercel.app/license",
-    siteName: "Heya",
-    type: "website",
-  },
-
-  robots: {
-    index: true,
-    follow: true,
-  },
-};
+export const metadata = pageMetadata("Stock Media License", "Read the Heya License to understand how stock photos and videos downloaded from Heya may be used.", "/license");
 
 export default function LicensePage() {
   return (
@@ -189,12 +167,12 @@ export default function LicensePage() {
               please contact us.
             </p>
 
-            <a
+            <Link prefetch={false}
               href="/contact"
               className="mt-4 inline-block rounded-xl bg-black px-6 py-3 font-semibold text-white transition hover:bg-gray-800"
             >
               Contact Heya
-            </a>
+            </Link>
           </section>
         </div>
       </section>

@@ -1,116 +1,10 @@
-import type { Metadata } from "next";
-import { createClient } from "@supabase/supabase-js";
-
+import Link from "next/link";
+import VideoPreview from "@/components/VideoPreview";
+import StockImage from "@/components/StockImage";
+import { getCategories } from "@/lib/catalog";
+import { pageMetadata, categorySlug as makeSlug } from "@/lib/seo";
 export const dynamic = "force-dynamic";
-
-type MediaItem = {
-  id: number;
-  title: string;
-  category: string;
-  image_url: string;
-  status: string;
-  media_type: string | null;
-};
-
-type CategoryItem = {
-  name: string;
-  count: number;
-  previewUrl: string;
-  previewType: string | null;
-};
-
-const baseUrl = "https://heya-stock.vercel.app";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  {
-    auth: {
-      persistSession: false,
-    },
-  }
-);
-
-export const metadata: Metadata = {
-  title: "Browse Stock Photo & Video Categories",
-
-  description:
-    "Browse free stock photo and video categories on Heya, including travel, technology, business and more.",
-
-  alternates: {
-    canonical: "/categories",
-  },
-
-  openGraph: {
-    title: "Browse Stock Photo & Video Categories | Heya",
-    description:
-      "Explore free stock photos and videos by category on Heya.",
-    url: `${baseUrl}/categories`,
-    siteName: "Heya",
-    type: "website",
-  },
-
-  twitter: {
-    card: "summary_large_image",
-    title: "Browse Stock Photo & Video Categories | Heya",
-    description:
-      "Explore free stock photos and videos by category on Heya.",
-  },
-
-  robots: {
-    index: true,
-    follow: true,
-  },
-};
-
-async function getCategories(): Promise<CategoryItem[]> {
-  const { data, error } = await supabase
-    .from("images")
-    .select(
-      "id, title, category, image_url, status, media_type"
-    )
-    .eq("status", "approved")
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    console.error("Failed to load categories:", error);
-    return [];
-  }
-
-  const media = (data || []) as MediaItem[];
-
-  const map = new Map<string, CategoryItem>();
-
-  media.forEach((item) => {
-    const category = item.category?.trim();
-
-    if (!category) return;
-
-    const current = map.get(category);
-
-    if (!current) {
-      map.set(category, {
-        name: category,
-        count: 1,
-        previewUrl: item.image_url,
-        previewType: item.media_type,
-      });
-    } else {
-      current.count += 1;
-    }
-  });
-
-  return Array.from(map.values()).sort((a, b) =>
-    a.name.localeCompare(b.name)
-  );
-}
-
-function makeSlug(category: string) {
-  return encodeURIComponent(
-    category.toLowerCase().replace(/\s+/g, "-")
-  );
-}
-
+export const metadata = pageMetadata("Browse Stock Photo & Video Categories", "Browse free stock photos and videos by category, including travel, technology, business and nature.", "/categories");
 export default async function CategoriesPage() {
   const categories = await getCategories();
 
@@ -150,7 +44,7 @@ export default async function CategoriesPage() {
                 category.previewType === "video";
 
               return (
-                <a
+                <Link prefetch={false}
                   key={category.name}
                   href={`/categories/${makeSlug(
                     category.name
@@ -160,11 +54,9 @@ export default async function CategoriesPage() {
                   <div className="relative h-56 overflow-hidden bg-gray-200">
                     {isVideo ? (
                       <>
-                        <video
+                        <VideoPreview
                           src={category.previewUrl}
-                          muted
-                          playsInline
-                          preload="metadata"
+
                           className="h-full w-full object-cover"
                         />
 
@@ -173,7 +65,7 @@ export default async function CategoriesPage() {
                         </span>
                       </>
                     ) : (
-                      <img
+                      <StockImage sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
                         src={category.previewUrl}
                         alt={`${category.name} stock photos and videos`}
                         className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
@@ -193,7 +85,7 @@ export default async function CategoriesPage() {
                         : "media items"}
                     </p>
                   </div>
-                </a>
+                </Link>
               );
             })}
           </div>

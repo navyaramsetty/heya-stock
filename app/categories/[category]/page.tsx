@@ -1,142 +1,30 @@
 import type { Metadata } from "next";
-import { createClient } from "@supabase/supabase-js";
+import { notFound, permanentRedirect } from "next/navigation";
 import CategoryClient from "./CategoryClient";
-
-type MediaItem = {
-  id: number;
-  title: string;
-  category: string;
-  image_url: string;
-  status: string;
-  media_type: string | null;
-};
-
-const baseUrl = "https://heya-stock.vercel.app";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  {
-    auth: {
-      persistSession: false,
-    },
-  }
-);
-
-function normalizeCategory(value: string) {
-  return decodeURIComponent(value)
-    .replace(/-/g, " ")
-    .trim();
+import Pagination from "@/components/Pagination";
+import { getCategories, getMediaPage, pageNumber } from "@/lib/catalog";
+import { categorySlug, pageMetadata } from "@/lib/seo";
+type Props = { params: Promise<{ category: string }>; searchParams: Promise<{ page?: string }> };
+async function resolveCategory(slug: string) {
+  const category = (await getCategories()).find(item => decodeURIComponent(categorySlug(item.name)) === slug.toLowerCase());
+  if (!category) notFound();
+  return category;
 }
-
-function formatCategoryName(value: string) {
-  return value
-    .split(" ")
-    .map(
-      (word) =>
-        word.charAt(0).toUpperCase() +
-        word.slice(1).toLowerCase()
-    )
-    .join(" ");
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
+  const category = await resolveCategory((await params).category);
+  const page = pageNumber((await searchParams).page);
+  const path = "/categories/" + categorySlug(category.name) + (page > 1 ? "?page=" + page : "");
+  return pageMetadata(category.name + " Stock Photos & Videos" + (page > 1 ? " - Page " + page : ""),
+    "Browse free " + category.name.toLowerCase() + " stock photos and videos for your next creative project.", path);
 }
-
-async function getCategoryMedia(category: string) {
-  const normalizedCategory = normalizeCategory(category);
-
-  const { data, error } = await supabase
-    .from("images")
-    .select(
-      "id, title, category, image_url, status, media_type"
-    )
-    .eq("status", "approved")
-    .ilike("category", normalizedCategory)
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    console.error("Failed to load category media:", error);
-    return [];
-  }
-
-  return (data || []) as MediaItem[];
-}
-
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ category: string }>;
-}): Promise<Metadata> {
-  const { category } = await params;
-
-  const normalizedCategory =
-    normalizeCategory(category);
-
-  const categoryName =
-    formatCategoryName(normalizedCategory);
-
-  const title = `${categoryName} Stock Photos & Videos`;
-
-  const description = `Browse and download free ${categoryName.toLowerCase()} stock photos and videos for websites, social media, marketing, design and creative projects.`;
-
-  const canonicalPath = `/categories/${encodeURIComponent(
-    normalizedCategory.toLowerCase().replace(/\s+/g, "-")
-  )}`;
-
-  return {
-    title,
-    description,
-
-    keywords: [
-      `${categoryName} stock photos`,
-      `${categoryName} stock videos`,
-      `free ${categoryName.toLowerCase()} images`,
-      `free ${categoryName.toLowerCase()} videos`,
-      `${categoryName} stock media`,
-    ],
-
-    alternates: {
-      canonical: canonicalPath,
-    },
-
-    openGraph: {
-      title: `${title} | Heya`,
-      description,
-      url: `${baseUrl}${canonicalPath}`,
-      siteName: "Heya",
-      type: "website",
-    },
-
-    twitter: {
-      card: "summary_large_image",
-      title: `${title} | Heya`,
-      description,
-    },
-
-    robots: {
-      index: true,
-      follow: true,
-    },
-  };
-}
-
-export default async function CategoryPage({
-  params,
-}: {
-  params: Promise<{ category: string }>;
-}) {
-  const { category } = await params;
-
-  const normalizedCategory =
-    normalizeCategory(category);
-
-  const categoryName =
-    formatCategoryName(normalizedCategory);
-
-  const media = await getCategoryMedia(category);
-
-  return (
-    <CategoryClient
-      media={media}
-      categoryName={categoryName}
-    />
-  );
+export default async function CategoryPage({ params, searchParams }: Props) {
+  const { category: slug } = await params;
+  const category = await resolveCategory(slug);
+  const page = pageNumber((await searchParams).page);
+  const path = "/categories/" + categorySlug(category.name);
+  if (encodeURIComponent(slug) !== categorySlug(category.name)) permanentRedirect(path + (page > 1 ? "?page=" + page : ""));
+  const { items, count } = await getMediaPage(page, "", "all", category.name);
+  if (page > 1 && !items.length) notFound();
+  return <><CategoryClient media={items} categoryName={category.name} />
+    <div className="pb-12"><Pagination page={page} count={count} pathname={path} /></div></>;
 }

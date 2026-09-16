@@ -1,29 +1,6 @@
-import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Contact Heya",
-
-  description:
-    "Contact Heya for questions about stock photos, videos, contributor uploads, copyright concerns, privacy, or platform support.",
-
-  alternates: {
-    canonical: "/contact",
-  },
-
-  openGraph: {
-    title: "Contact Heya",
-    description:
-      "Get in touch with Heya for support, contributor questions, copyright concerns, privacy requests and general enquiries.",
-    url: "https://heya-stock.vercel.app/contact",
-    siteName: "Heya",
-    type: "website",
-  },
-
-  robots: {
-    index: true,
-    follow: true,
-  },
-};
+export const metadata = pageMetadata("Contact", "Contact Heya for questions about stock photos, videos, contributor uploads, copyright concerns, privacy, or platform support.", "/contact");
 
 export default function ContactPage() {
   return (

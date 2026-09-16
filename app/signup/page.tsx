@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -79,9 +80,9 @@ export default function SignupPage() {
     <main className="flex min-h-screen items-center justify-center bg-gray-100 px-6 text-black">
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-sm">
         <div className="mb-8 text-center">
-          <a href="/" className="text-3xl font-bold">
+          <Link prefetch={false} href="/" className="text-3xl font-bold">
             Heya
-          </a>
+          </Link>
 
           <h1 className="mt-6 text-2xl font-bold">
             Create your account
@@ -177,17 +178,17 @@ export default function SignupPage() {
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-500">
             Already have an account?{" "}
-            <a href="/login" className="font-semibold text-black">
+            <Link prefetch={false} href="/login" className="font-semibold text-black">
               Login
-            </a>
+            </Link>
           </p>
 
-          <a
+          <Link prefetch={false}
             href="/"
             className="mt-4 inline-block text-sm font-semibold text-gray-600"
           >
             ← Back to Heya
-          </a>
+          </Link>
         </div>
       </div>
     </main>

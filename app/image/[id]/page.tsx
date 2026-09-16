@@ -1,235 +1,44 @@
 import type { Metadata } from "next";
-import { createClient } from "@supabase/supabase-js";
+import { notFound, permanentRedirect } from "next/navigation";
+import { getMedia } from "@/lib/catalog";
+import { getVideoPoster } from "@/lib/video-poster";
+import { SITE_URL, DEFAULT_IMAGE, pageMetadata, categorySlug, jsonLd } from "@/lib/seo";
 import MediaDetailClient from "./MediaDetailClient";
-
-type MediaItem = {
-  id: number;
-  title: string;
-  category: string;
-  tags: string | null;
-  description: string | null;
-  image_url: string;
-  status: string;
-  downloads: number;
-  media_type: string | null;
-  created_at: string;
-};
-
-const baseUrl = "https://heya-stock.vercel.app";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  {
-    auth: {
-      persistSession: false,
-    },
-  }
-);
-
-async function getMedia(id: number): Promise<MediaItem | null> {
-  if (!id) return null;
-
-  const { data, error } = await supabase
-    .from("images")
-    .select(
-      "id, title, category, tags, description, image_url, status, downloads, media_type, created_at"
-    )
-    .eq("id", id)
-    .eq("status", "approved")
-    .single();
-
-  if (error || !data) {
-    return null;
-  }
-
-  return data;
+type Props = { params: Promise<{ id: string }> };
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const media = await getMedia((await params).id);
+  if (!media) notFound();
+  const video = media.media_type === "video";
+  const poster = video ? await getVideoPoster(media.image_url) : media.image_url;
+  return pageMetadata(media.title + " - Free Stock " + (video ? "Video" : "Photo"),
+    media.description?.trim() || "Download " + media.title + ", a free " + media.category.toLowerCase() + " stock " + (video ? "video" : "photo") + " from Heya.",
+    "/image/" + media.id, poster || DEFAULT_IMAGE);
 }
-
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}): Promise<Metadata> {
+export default async function MediaPage({ params }: Props) {
   const { id } = await params;
-
-  const media = await getMedia(Number(id));
-
-  if (!media) {
-    return {
-      title: "Media Not Found",
-      description:
-        "The requested stock media could not be found on Heya.",
-      robots: {
-        index: false,
-        follow: false,
-      },
-    };
-  }
-
-  const isVideo = media.media_type === "video";
-
-  const description =
-    media.description ||
-    `Download this free ${
-      isVideo ? "stock video" : "stock photo"
-    } from Heya for websites, social media, marketing and creative projects.`;
-
-  const keywords = media.tags
-    ? media.tags
-        .split(",")
-        .map((tag) => tag.trim())
-        .filter(Boolean)
-    : [];
-
-  const pageTitle = `${media.title} - Free Stock ${
-    isVideo ? "Video" : "Photo"
-  }`;
-
-  return {
-    title: pageTitle,
-    description,
-
-    keywords: [
-      media.title,
-      media.category,
-      isVideo ? "free stock video" : "free stock photo",
-      ...keywords,
+  const media = await getMedia(id);
+  if (!media) notFound();
+  if (id !== String(media.id)) permanentRedirect("/image/" + media.id);
+  const video = media.media_type === "video";
+  const poster = video ? await getVideoPoster(media.image_url) : null;
+  const description = media.description?.trim() || media.title + ": free " + media.category.toLowerCase() + " stock " + (video ? "video" : "photo") + " available on Heya.";
+  const breadcrumb = {
+    "@context": "https://schema.org", "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL },
+      { "@type": "ListItem", position: 2, name: media.category, item: SITE_URL + "/categories/" + categorySlug(media.category) },
+      { "@type": "ListItem", position: 3, name: media.title, item: SITE_URL + "/image/" + media.id },
     ],
-
-    alternates: {
-      canonical: `/image/${media.id}`,
-    },
-
-    openGraph: {
-      title: pageTitle,
-      description,
-      url: `${baseUrl}/image/${media.id}`,
-      siteName: "Heya",
-      type: "website",
-
-      images: !isVideo
-        ? [
-            {
-              url: media.image_url,
-              alt: media.title,
-            },
-          ]
-        : undefined,
-
-      videos: isVideo
-        ? [
-            {
-              url: media.image_url,
-            },
-          ]
-        : undefined,
-    },
-
-    twitter: {
-      card: "summary_large_image",
-      title: pageTitle,
-      description,
-      images: !isVideo ? [media.image_url] : undefined,
-    },
-
-    robots: {
-      index: true,
-      follow: true,
-      googleBot: {
-        index: true,
-        follow: true,
-        "max-image-preview": "large",
-        "max-video-preview": -1,
-        "max-snippet": -1,
-      },
-    },
   };
-}
-
-export default async function MediaPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
-
-  const media = await getMedia(Number(id));
-
-  if (!media) {
-    return (
-      <main className="flex min-h-screen flex-col items-center justify-center bg-white px-6 text-center text-black">
-        <h1 className="text-3xl font-bold">
-          Media not found
-        </h1>
-
-        <p className="mt-3 text-gray-500">
-          This item may not exist or may not be approved yet.
-        </p>
-
-        <a
-          href="/"
-          className="mt-6 rounded-xl bg-black px-6 py-3 font-semibold text-white"
-        >
-          Back to Heya
-        </a>
-      </main>
-    );
-  }
-
-  const isVideo = media.media_type === "video";
-
-  const description =
-    media.description ||
-    `Free ${
-      isVideo ? "stock video" : "stock photo"
-    } available to download from Heya.`;
-
-  const keywords = media.tags
-    ? media.tags
-        .split(",")
-        .map((tag) => tag.trim())
-        .filter(Boolean)
-    : [];
-
-  const structuredData = isVideo
-    ? {
-        "@context": "https://schema.org",
-        "@type": "VideoObject",
-        name: media.title,
-        description,
-        uploadDate: media.created_at,
-        contentUrl: media.image_url,
-        url: `${baseUrl}/image/${media.id}`,
-        keywords: keywords.join(", "),
-        genre: media.category,
-      }
-    : {
-        "@context": "https://schema.org",
-        "@type": "ImageObject",
-        name: media.title,
-        description,
-        contentUrl: media.image_url,
-        url: `${baseUrl}/image/${media.id}`,
-        uploadDate: media.created_at,
-        keywords: keywords.join(", "),
-        genre: media.category,
-        representativeOfPage: true,
-      };
-
-  return (
-    <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify(structuredData).replace(
-            /</g,
-            "\\u003c"
-          ),
-        }}
-      />
-
-      <MediaDetailClient initialMedia={media} />
-    </>
-  );
+  // A brand card is not a video thumbnail; omit incomplete VideoObject for legacy uploads.
+  const object = video && !poster ? null : {
+    "@context": "https://schema.org", "@type": video ? "VideoObject" : "ImageObject",
+    name: media.title, description, contentUrl: media.image_url, url: SITE_URL + "/image/" + media.id,
+    ...(video ? { uploadDate: media.created_at, thumbnailUrl: [poster] } : { representativeOfPage: true, datePublished: media.created_at, license: SITE_URL + "/license", acquireLicensePage: SITE_URL + "/image/" + media.id }),
+    keywords: media.tags || undefined,
+  };
+  return <>
+    <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(object ? [breadcrumb, object] : [breadcrumb]) }} />
+    <MediaDetailClient initialMedia={{ ...media, description }} poster={poster} />
+  </>;
 }

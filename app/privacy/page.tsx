@@ -1,29 +1,7 @@
-import type { Metadata } from "next";
+import Link from "next/link";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Privacy Policy",
-
-  description:
-    "Read the Heya Privacy Policy to understand how information is collected, used and protected when you use our free stock photo and video platform.",
-
-  alternates: {
-    canonical: "/privacy",
-  },
-
-  openGraph: {
-    title: "Privacy Policy | Heya",
-    description:
-      "Learn how Heya collects, uses and protects information across our stock photo and video platform.",
-    url: "https://heya-stock.vercel.app/privacy",
-    siteName: "Heya",
-    type: "website",
-  },
-
-  robots: {
-    index: true,
-    follow: true,
-  },
-};
+export const metadata = pageMetadata("Privacy Policy", "Read the Heya Privacy Policy to understand how information is collected, used and protected when you use our free stock photo and video platform.", "/privacy");
 
 export default function PrivacyPage() {
   return (
@@ -147,7 +125,7 @@ export default function PrivacyPage() {
             <p className="mt-4">
               If Google advertising services are used on Heya, Google
               and its advertising partners may use cookies to serve ads
-              based on a user's visit to Heya or other websites.
+              based on a user&apos;s visit to Heya or other websites.
             </p>
 
             <p className="mt-4">
@@ -184,7 +162,7 @@ export default function PrivacyPage() {
 
           <section>
             <h2 className="text-2xl font-bold text-black">
-              10. Children's Privacy
+              10. Children&apos;s Privacy
             </h2>
 
             <p className="mt-4">
@@ -216,12 +194,12 @@ export default function PrivacyPage() {
               contact Heya through our Contact page.
             </p>
 
-            <a
+            <Link prefetch={false}
               href="/contact"
               className="mt-4 inline-block font-semibold text-black underline"
             >
               Contact Heya
-            </a>
+            </Link>
           </section>
         </div>
       </section>

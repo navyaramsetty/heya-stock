@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -214,24 +215,24 @@ export default function UploadPage() {
     <main className="min-h-screen bg-gray-50 text-black">
       <header className="border-b bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <a href="/" className="text-2xl font-bold">
+          <Link prefetch={false} href="/" className="text-2xl font-bold">
             Heya
-          </a>
+          </Link>
 
           <div className="flex items-center gap-4">
-            <a
+            <Link prefetch={false}
               href="/dashboard"
               className="text-sm font-semibold text-gray-600"
             >
               Dashboard
-            </a>
+            </Link>
 
-            <a
+            <Link prefetch={false}
               href="/"
               className="rounded-full border px-5 py-2 text-sm font-semibold"
             >
               Explore
-            </a>
+            </Link>
           </div>
         </div>
       </header>

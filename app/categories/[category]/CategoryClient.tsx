@@ -1,4 +1,6 @@
-"use client";
+import Link from "next/link";
+import VideoPreview from "@/components/VideoPreview";
+import StockImage from "@/components/StockImage";
 
 type MediaItem = {
   id: number;
@@ -19,12 +21,12 @@ export default function CategoryClient({
   return (
     <main className="min-h-screen bg-white text-black">
       <section className="mx-auto max-w-7xl px-6 py-12">
-        <a
+        <Link prefetch={false}
           href="/categories"
           className="mb-6 inline-block text-sm font-semibold text-gray-600 transition hover:text-black"
         >
           ← Back to Categories
-        </a>
+        </Link>
 
         <div className="mb-10">
           <p className="text-sm font-semibold uppercase tracking-widest text-gray-500">
@@ -53,15 +55,13 @@ export default function CategoryClient({
                   key={item.id}
                   className="group overflow-hidden rounded-2xl border bg-white transition hover:-translate-y-1 hover:shadow-lg"
                 >
-                  <a href={`/image/${item.id}`}>
+                  <Link prefetch={false} href={`/image/${item.id}`}>
                     <div className="relative h-72 overflow-hidden bg-gray-200">
                       {isVideo ? (
                         <>
-                          <video
+                          <VideoPreview
                             src={item.image_url}
-                            muted
-                            playsInline
-                            preload="metadata"
+
                             className="h-full w-full object-cover"
                           />
 
@@ -70,14 +70,14 @@ export default function CategoryClient({
                           </span>
                         </>
                       ) : (
-                        <img
+                        <StockImage sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
                           src={item.image_url}
-                          alt={`${item.title} free stock photo`}
+                          alt={item.title}
                           className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                         />
                       )}
                     </div>
-                  </a>
+                  </Link>
 
                   <div className="p-4">
                     <h2 className="font-bold">
@@ -88,14 +88,14 @@ export default function CategoryClient({
                       {item.category}
                     </p>
 
-                    <a
+                    <Link prefetch={false}
                       href={`/image/${item.id}`}
                       className="mt-4 inline-block rounded-lg bg-black px-4 py-2 text-sm font-semibold text-white transition hover:bg-gray-800"
                     >
                       {isVideo
                         ? "View Video"
                         : "View Photo"}
-                    </a>
+                    </Link>
                   </div>
                 </div>
               );
@@ -114,12 +114,12 @@ export default function CategoryClient({
               videos in this category.
             </p>
 
-            <a
+            <Link prefetch={false}
               href="/categories"
               className="mt-6 inline-block rounded-xl bg-black px-6 py-3 font-semibold text-white transition hover:bg-gray-800"
             >
               Browse Other Categories
-            </a>
+            </Link>
           </div>
         )}
       </section>

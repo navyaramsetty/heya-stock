@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -37,9 +38,9 @@ export default function AdminLoginPage() {
     <main className="flex min-h-screen items-center justify-center bg-gray-100 px-6 text-black">
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-sm">
         <div className="mb-8 text-center">
-          <a href="/" className="text-3xl font-bold">
+          <Link prefetch={false} href="/" className="text-3xl font-bold">
             Heya
-          </a>
+          </Link>
 
           <h1 className="mt-6 text-2xl font-bold">
             Admin Login
@@ -97,12 +98,12 @@ export default function AdminLoginPage() {
         </form>
 
         <div className="mt-6 text-center">
-          <a
+          <Link prefetch={false}
             href="/"
             className="text-sm font-semibold text-gray-600"
           >
             ← Back to Heya
-          </a>
+          </Link>
         </div>
       </div>
     </main>

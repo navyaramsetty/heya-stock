@@ -1,6 +1,10 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import Link from "next/link";
+import VideoPreview from "@/components/VideoPreview";
+import StockImage from "@/components/StockImage";
+import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 
@@ -20,13 +24,13 @@ type MediaItem = {
 type FilterType = "all" | "image" | "video";
 
 export default function HomeClient({
-  initialItems,
+  initialItems, search, filter, count,
 }: {
   initialItems: MediaItem[];
+  search: string; filter: FilterType; count: number;
 }) {
-  const [items] = useState<MediaItem[]>(initialItems);
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<FilterType>("all");
+  const router = useRouter();
+  const items = initialItems;
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
@@ -53,63 +57,30 @@ export default function HomeClient({
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    window.location.href = "/";
+    router.push("/");
+    router.refresh();
   };
 
-  const filteredItems = useMemo(() => {
-    const query = search.trim().toLowerCase();
-
-    return items.filter((item) => {
-      const mediaType = item.media_type || "image";
-
-      const matchesType =
-        filter === "all" || mediaType === filter;
-
-      if (!matchesType) return false;
-
-      if (!query) return true;
-
-      const searchableText = [
-        item.title,
-        item.category,
-        item.tags,
-        item.description,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-
-      return searchableText.includes(query);
-    });
-  }, [items, search, filter]);
-
-  const photoCount = items.filter(
-    (item) => (item.media_type || "image") === "image"
-  ).length;
-
-  const videoCount = items.filter(
-    (item) => item.media_type === "video"
-  ).length;
-
+  const filteredItems = items;
   return (
     <main className="bg-white text-black">
       <section className="border-b bg-white">
         <div className="mx-auto flex max-w-7xl justify-end gap-3 px-5 py-3">
           {user ? (
             <>
-              <a
+              <Link prefetch={false}
                 href="/upload"
                 className="rounded-full bg-black px-4 py-2 text-sm font-semibold text-white transition hover:bg-gray-800"
               >
                 Upload
-              </a>
+              </Link>
 
-              <a
+              <Link prefetch={false}
                 href="/dashboard"
                 className="rounded-full border px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
               >
                 Dashboard
-              </a>
+              </Link>
 
               <button
                 onClick={handleLogout}
@@ -120,19 +91,19 @@ export default function HomeClient({
             </>
           ) : (
             <>
-              <a
+              <Link prefetch={false}
                 href="/login"
                 className="px-3 py-2 text-sm font-semibold text-gray-700"
               >
                 Login
-              </a>
+              </Link>
 
-              <a
+              <Link prefetch={false}
                 href="/signup"
                 className="rounded-full bg-black px-4 py-2 text-sm font-semibold text-white transition hover:bg-gray-800"
               >
                 Sign Up
-              </a>
+              </Link>
             </>
           )}
         </div>
@@ -145,9 +116,9 @@ export default function HomeClient({
           </p>
 
           <h1 className="text-4xl font-black tracking-tight sm:text-6xl">
-            Free Stock photos & Videos
+            Free Stock Photos & Videos
             <br />
-            for bloggers,creators and small business
+            for bloggers, creators and small businesses
           </h1>
 
           <p className="mx-auto mt-6 max-w-2xl text-base leading-7 text-gray-600 sm:text-lg">
@@ -155,54 +126,17 @@ export default function HomeClient({
             social media, designs and creative projects.
           </p>
 
-          <div className="mx-auto mt-10 max-w-3xl">
-            <div className="flex items-center rounded-2xl border bg-white px-5 shadow-sm">
-              <span className="text-xl">⌕</span>
 
-              <input
-                type="text"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search photos, videos, categories or tags..."
-                className="w-full bg-transparent px-4 py-5 text-base outline-none"
-              />
-            </div>
-          </div>
-
-          <div className="mt-8 flex flex-wrap justify-center gap-3">
-            <button
-              onClick={() => setFilter("all")}
-              className={`rounded-full px-5 py-2 text-sm font-semibold transition ${
-                filter === "all"
-                  ? "bg-black text-white"
-                  : "border bg-white text-gray-700 hover:bg-gray-100"
-              }`}
-            >
-              All ({items.length})
-            </button>
-
-            <button
-              onClick={() => setFilter("image")}
-              className={`rounded-full px-5 py-2 text-sm font-semibold transition ${
-                filter === "image"
-                  ? "bg-black text-white"
-                  : "border bg-white text-gray-700 hover:bg-gray-100"
-              }`}
-            >
-              Photos ({photoCount})
-            </button>
-
-            <button
-              onClick={() => setFilter("video")}
-              className={`rounded-full px-5 py-2 text-sm font-semibold transition ${
-                filter === "video"
-                  ? "bg-black text-white"
-                  : "border bg-white text-gray-700 hover:bg-gray-100"
-              }`}
-            >
-              Videos ({videoCount})
-            </button>
-          </div>
+          <form action="/" method="get" className="mx-auto mt-10 flex max-w-3xl flex-wrap gap-3">
+            <label className="sr-only" htmlFor="media-search">Search photos and videos</label>
+            <input id="media-search" type="search" name="q" defaultValue={search} key={search} maxLength={120}
+              placeholder="Search photos, videos, categories or tags..." className="min-w-0 flex-1 rounded-xl border bg-white p-4" />
+            <label className="sr-only" htmlFor="media-type">Media type</label>
+            <select id="media-type" name="type" defaultValue={filter} key={filter} className="rounded-xl border bg-white p-4">
+              <option value="all">All media</option><option value="image">Photos</option><option value="video">Videos</option>
+            </select>
+            <button type="submit" className="rounded-xl bg-black px-6 py-4 font-semibold text-white">Search</button>
+          </form>
         </div>
       </section>
 
@@ -226,8 +160,8 @@ export default function HomeClient({
           </div>
 
           <p className="text-sm text-gray-500">
-            {filteredItems.length}{" "}
-            {filteredItems.length === 1 ? "result" : "results"}
+            {count}{" "}
+            {count === 1 ? "result" : "results"}
           </p>
         </div>
 
@@ -251,18 +185,16 @@ export default function HomeClient({
                   key={item.id}
                   className="group relative mb-5 break-inside-avoid overflow-hidden rounded-2xl bg-gray-100"
                 >
-                  <a
+                  <Link prefetch={false}
                     href={`/image/${item.id}`}
-                    className="block"
+                    className="relative block aspect-[4/3]"
                   >
                     {isVideo ? (
-                      <div className="relative overflow-hidden bg-black">
-                        <video
+                      <div className="relative h-full overflow-hidden bg-black">
+                        <VideoPreview
                           src={item.image_url || ""}
-                          muted
-                          playsInline
-                          preload="metadata"
-                          className="max-h-[520px] w-full object-cover"
+
+                          className="h-full w-full object-cover"
                         />
 
                         <span className="pointer-events-none absolute left-3 top-3 rounded-full bg-black/70 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
@@ -270,14 +202,13 @@ export default function HomeClient({
                         </span>
                       </div>
                     ) : (
-                      <img
+                      <StockImage
                         src={item.image_url || ""}
-                        alt={`${item.title} free stock photo`}
-                        loading="lazy"
+                        alt={item.title}
                         className="w-full object-cover transition duration-300 group-hover:scale-[1.02]"
                       />
                     )}
-                  </a>
+                  </Link>
 
                   <div className="bg-white p-4">
                     <div className="flex items-start justify-between gap-4">
@@ -308,12 +239,12 @@ export default function HomeClient({
                       )}
                     </div>
 
-                    <a
+                    <Link prefetch={false}
                       href={`/image/${item.id}`}
                       className="mt-4 block rounded-xl border px-4 py-2 text-center text-sm font-semibold transition hover:bg-gray-50"
                     >
                       {isVideo ? "View Video" : "View Photo"}
-                    </a>
+                    </Link>
                   </div>
                 </article>
               );
@@ -338,12 +269,12 @@ export default function HomeClient({
             preview and download.
           </p>
 
-          <a
+          <Link prefetch={false}
             href="/about"
             className="mt-7 inline-block rounded-xl bg-black px-6 py-3 text-sm font-semibold text-white transition hover:bg-gray-800"
           >
             Learn About Heya
-          </a>
+          </Link>
         </div>
       </section>
     </main>
