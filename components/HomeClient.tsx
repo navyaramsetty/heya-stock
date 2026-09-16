@@ -145,9 +145,9 @@ export default function HomeClient({
           </p>
 
           <h1 className="text-4xl font-black tracking-tight sm:text-6xl">
-            Free Stock Images & Videos
+            Free Stock photos & Videos
             <br />
-            for Everyone
+            for bloggers,creators and small business
           </h1>
 
           <p className="mx-auto mt-6 max-w-2xl text-base leading-7 text-gray-600 sm:text-lg">
