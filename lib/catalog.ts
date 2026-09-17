@@ -69,3 +69,29 @@ export const getCategories = cache(async () => {
   }
   return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name));
 });
+
+
+export type RelatedMediaItem = Pick<MediaItem, "id" | "title" | "category" | "image_url" | "media_type">;
+
+export const getRelatedMedia = cache(async (currentId: number, category: string): Promise<RelatedMediaItem[]> => {
+  if (!category.trim()) return [];
+  // Recommendations must never prevent the requested detail page from loading.
+  try {
+    const { data, error } = await publicDatabase().from("images")
+      .select("id,title,category,image_url,media_type")
+      .eq("status", "approved")
+      .eq("category", category)
+      .neq("id", currentId)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(6);
+    if (error) {
+      console.error("Unable to load related media:", error.message);
+      return [];
+    }
+    return data || [];
+  } catch (error) {
+    console.error("Unable to load related media:", error);
+    return [];
+  }
+});

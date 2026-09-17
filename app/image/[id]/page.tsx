@@ -5,6 +5,7 @@ import { getVideoPoster } from "@/lib/video-poster";
 import { videoStructuredData } from "@/lib/video-schema";
 import { SITE_URL, DEFAULT_IMAGE, pageMetadata, categorySlug, jsonLd } from "@/lib/seo";
 import MediaDetailClient from "./MediaDetailClient";
+import RelatedContent from "@/components/RelatedContent";
 type Props = { params: Promise<{ id: string }> };
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const media = await getMedia((await params).id);
@@ -41,5 +42,6 @@ export default async function MediaPage({ params }: Props) {
   return <>
     <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(object ? [breadcrumb, object] : [breadcrumb]) }} />
     <MediaDetailClient initialMedia={{ ...media, description }} poster={poster} />
+    <RelatedContent currentId={media.id} category={media.category} />
   </>;
 }

@@ -22,7 +22,7 @@ function harness(responses = []) {
           const operations = [];
           requests.push(operations);
           const builder = {};
-          for (const method of ["select", "eq", "ilike", "or", "order", "range", "gt", "limit", "maybeSingle"]) {
+          for (const method of ["select", "eq", "neq", "ilike", "or", "order", "range", "gt", "limit", "maybeSingle"]) {
             builder[method] = (...args) => { operations.push([method, ...args]); return builder; };
           }
           builder.then = (yes, no) => Promise.resolve(responses.shift() || { data: [], error: null, count: 0 }).then(yes, no);
@@ -141,4 +141,29 @@ test("video schema rejects absent thumbnails and invalid required values", () =>
   for (const thumbnail of [null, "", "data:image/jpeg;base64,test", "/relative.jpg"]) assert.equal(videoStructuredData(video, "Description", thumbnail), null);
   assert.equal(videoStructuredData({ ...video, created_at: "invalid" }, "Description", "https://example.com/poster.jpg"), null);
   assert.equal(videoStructuredData({ ...video, title: " " }, "Description", "https://example.com/poster.jpg"), null);
+});
+
+
+test("related media is approved, same-category, excludes the current item and is bounded", async () => {
+  const { load, requests } = harness([{ data: [{ id: 8, title: "Related", category: "Travel" }], error: null }]);
+  const items = await load("lib/catalog.ts").getRelatedMedia(5, "Travel");
+  const ops = requests[0];
+  assert.equal(items[0].id, 8);
+  assert.ok(ops.some(op => op[0] === "eq" && op[1] === "status" && op[2] === "approved"));
+  assert.ok(ops.some(op => op[0] === "eq" && op[1] === "category" && op[2] === "Travel"));
+  assert.ok(ops.some(op => op[0] === "neq" && op[1] === "id" && op[2] === 5));
+  assert.deepEqual(ops.find(op => op[0] === "limit"), ["limit", 6]);
+  assert.deepEqual(ops.filter(op => op[0] === "order").map(op => op[1]), ["created_at", "id"]);
+});
+test("empty categories and missing recommendations leave the detail page usable", async () => {
+  const { load, requests } = harness();
+  const catalog = load("lib/catalog.ts");
+  assert.equal((await catalog.getRelatedMedia(5, " ")).length, 0);
+  assert.equal(requests.length, 0);
+  assert.equal((await catalog.getRelatedMedia(5, "Travel")).length, 0);
+});
+test("related-content database failures are nonfatal", async () => {
+  const { load } = harness([{ data: null, error: { message: "Recommendation lookup unavailable" } }]);
+  const result = await load("lib/catalog.ts").getRelatedMedia(5, "Travel");
+  assert.equal(result.length, 0);
 });
