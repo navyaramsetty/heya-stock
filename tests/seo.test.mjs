@@ -13,7 +13,7 @@ function harness(responses = []) {
     const absolute = resolve(root, file);
     if (modules.has(absolute)) return modules.get(absolute);
     const source = readFileSync(absolute, "utf8");
-    const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+    const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, esModuleInterop: true, target: ts.ScriptTarget.ES2022 } }).outputText;
     const compiled = { exports: {} };
     function require(name) {
       if (name === "react") return { cache: fn => fn };
@@ -29,6 +29,7 @@ function harness(responses = []) {
           return builder;
         },
       }) };
+      if (name.endsWith(".json")) return JSON.parse(readFileSync(resolve(dirname(absolute), name), "utf8"));
       if (name.startsWith(".")) return load(resolve(dirname(absolute), name + ".ts"));
       throw new Error("Unexpected import: " + name);
     }
@@ -110,4 +111,34 @@ test("out-of-range database responses become an empty page for 404 handling", as
   const { load } = harness([{ data: null, error: { code: "PGRST103", message: "Requested range not satisfiable" } }]);
   const page = await load("lib/catalog.ts").getMediaPage(999999);
   assert.equal(page.items.length, 0);
+});
+
+
+test("every bundled video poster exists as a valid video-specific JPEG", async () => {
+  const thumbnails = JSON.parse(readFileSync(resolve(root, "lib/video-thumbnails.json"), "utf8"));
+  const { default: sharp } = await import("sharp");
+  const { getVideoPoster } = harness().load("lib/video-poster.ts");
+  const { videoStructuredData } = harness().load("lib/video-schema.ts");
+  const { SITE_URL } = harness().load("lib/seo.ts");
+  assert.ok(Object.keys(thumbnails).length > 0);
+  for (const [videoUrl, path] of Object.entries(thumbnails)) {
+    const image = await sharp(resolve(root, "public" + path)).metadata();
+    assert.equal(image.format, "jpeg");
+    assert.ok(image.width >= 60 && image.height >= 30);
+    const poster = await getVideoPoster(videoUrl);
+    assert.equal(poster, new URL(path, SITE_URL).href);
+    const object = videoStructuredData({ id: 5, title: "Video title", image_url: videoUrl, created_at: "2026-09-13T12:00:00+05:30", tags: null }, "Video description", poster);
+    assert.equal(object["@type"], "VideoObject");
+    assert.equal(object.thumbnailUrl[0], poster);
+    assert.equal(object.uploadDate, "2026-09-13T06:30:00.000Z");
+    assert.equal(object.contentUrl, videoUrl);
+    assert.notEqual(object.thumbnailUrl[0], videoUrl);
+  }
+});
+test("video schema rejects absent thumbnails and invalid required values", () => {
+  const { videoStructuredData } = harness().load("lib/video-schema.ts");
+  const video = { id: 5, title: "Test video", image_url: "https://example.com/video.mp4", created_at: "2026-09-13T12:00:00Z", tags: null };
+  for (const thumbnail of [null, "", "data:image/jpeg;base64,test", "/relative.jpg"]) assert.equal(videoStructuredData(video, "Description", thumbnail), null);
+  assert.equal(videoStructuredData({ ...video, created_at: "invalid" }, "Description", "https://example.com/poster.jpg"), null);
+  assert.equal(videoStructuredData({ ...video, title: " " }, "Description", "https://example.com/poster.jpg"), null);
 });

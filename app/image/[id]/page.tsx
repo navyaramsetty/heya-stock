@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
 import { getMedia } from "@/lib/catalog";
 import { getVideoPoster } from "@/lib/video-poster";
+import { videoStructuredData } from "@/lib/video-schema";
 import { SITE_URL, DEFAULT_IMAGE, pageMetadata, categorySlug, jsonLd } from "@/lib/seo";
 import MediaDetailClient from "./MediaDetailClient";
 type Props = { params: Promise<{ id: string }> };
@@ -30,11 +31,11 @@ export default async function MediaPage({ params }: Props) {
       { "@type": "ListItem", position: 3, name: media.title, item: SITE_URL + "/image/" + media.id },
     ],
   };
-  // A brand card is not a video thumbnail; omit incomplete VideoObject for legacy uploads.
-  const object = video && !poster ? null : {
-    "@context": "https://schema.org", "@type": video ? "VideoObject" : "ImageObject",
+  const object = video ? videoStructuredData(media, description, poster) : {
+    "@context": "https://schema.org", "@type": "ImageObject",
     name: media.title, description, contentUrl: media.image_url, url: SITE_URL + "/image/" + media.id,
-    ...(video ? { uploadDate: media.created_at, thumbnailUrl: [poster] } : { representativeOfPage: true, datePublished: media.created_at, license: SITE_URL + "/license", acquireLicensePage: SITE_URL + "/image/" + media.id }),
+    representativeOfPage: true, datePublished: media.created_at,
+    license: SITE_URL + "/license", acquireLicensePage: SITE_URL + "/image/" + media.id,
     keywords: media.tags || undefined,
   };
   return <>
